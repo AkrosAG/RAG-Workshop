@@ -1,0 +1,17 @@
+# Local secrets and state
+.env
+.chroma/
+.cache/
+**/.ipynb_checkpoints/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.uv/
+uv.lock
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
