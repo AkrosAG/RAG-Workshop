@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
 """
-Lädt die konsolidierten, aktuell anwendbaren Fassungen der Kern-Bundeserlasse
-als PDF von Fedlex herunter.
+Downloads the consolidated, currently applicable versions of core Swiss
+federal acts as PDFs from Fedlex.
 
-Vorgehen:
-  1. Eine SPARQL-Abfrage an https://fedlex.data.admin.ch/sparqlendpoint löst
-     pro SR-Nummer die URL der PDF-Manifestation der neuesten anwendbaren
-     Konsolidierung auf (JOLux-Modell: ConsolidationAbstract -> Consolidation
-     -> Expression -> Manifestation).
-  2. Die PDFs werden in das Zielverzeichnis geladen.
+Approach:
+  1. A SPARQL query against https://fedlex.data.admin.ch/sparqlendpoint
+     resolves, per SR number, the URL of the PDF manifestation of the
+     latest applicable consolidation (JOLux model: ConsolidationAbstract
+     -> Consolidation -> Expression -> Manifestation).
+  2. The PDFs are downloaded into the target directory.
 
-Nur Python-Standardbibliothek, keine Abhängigkeiten.
+Python standard library only, no dependencies.
 
-Nutzung:
-    python3 fedlex_download.py                 # Deutsch, ./fedlex_pdfs
-    python3 fedlex_download.py --lang fr       # Französisch
-    python3 fedlex_download.py --outdir /pfad  # anderes Zielverzeichnis
+Usage:
+    python3 fedlex_download.py                 # German, ./fedlex_pdfs
+    python3 fedlex_download.py --lang fr       # French
+    python3 fedlex_download.py --outdir /path  # different target directory
 
-Rechtlicher Hinweis: Die Wiederverwendung der Fedlex-Texte ist gemäss
-https://www.fedlex.admin.ch/de/broadcasters ausdrücklich erlaubt.
+Legal note: reuse of the Fedlex texts is explicitly permitted, see
+https://www.fedlex.admin.ch/de/broadcasters.
 """
 
 import argparse
@@ -30,9 +30,9 @@ import urllib.request
 from pathlib import Path
 
 SPARQL_ENDPOINT = "https://fedlex.data.admin.ch/sparqlendpoint"
-USER_AGENT = "fedlex-pdf-downloader/1.0 (persoenliche Nutzung)"
+USER_AGENT = "fedlex-pdf-downloader/1.0 (personal use)"
 
-# SR-Nummer -> Kurzbezeichnung (für Dateinamen)
+# SR number -> short title (used for file names)
 LAWS = {
     "101":     "BV",
     "210":     "ZGB",
@@ -61,12 +61,11 @@ LANG_URI = {
 
 def build_query(sr_numbers, lang_uri):
     values = " ".join(f'"{sr}"' for sr in sr_numbers)
-    # Kern der Abfrage entspricht dem offiziellen JOLux-Beispiel
+    # The core of the query follows the official JOLux example
     # (swiss.github.io/fedlex-jolux, "Classified Compilation").
-    # Ergänzt: Auflösung SR-Nummer -> ConsolidationAbstract über die
-    # Taxonomie-Notation sowie Filter auf heute anwendbare Fassungen
-    # (sonst könnte eine bereits publizierte, aber erst künftig geltende
-    # Fassung zurückkommen).
+    # Added: resolving SR number -> ConsolidationAbstract via the taxonomy
+    # notation, plus a filter on versions applicable today (otherwise an
+    # already published but only future-applicable version could be returned).
     return f"""
 PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#>
 PREFIX skos:  <http://www.w3.org/2004/02/skos/core#>
@@ -107,15 +106,15 @@ def run_sparql(query):
 
 
 def resolve_pdf_urls(sr_numbers, lang_uri):
-    """Gibt {sr: (datum, url)} der jeweils neuesten anwendbaren Fassung zurück."""
+    """Returns {sr: (date, url)} of the latest applicable version per act."""
     result = {}
     bindings = run_sparql(build_query(sr_numbers, lang_uri))["results"]["bindings"]
     for b in bindings:
         sr = b["sr"]["value"]
         date = b["date"]["value"]
         url = b["url"]["value"]
-        # Ergebnisse sind pro SR absteigend nach Datum sortiert:
-        # erster Treffer = neueste anwendbare Fassung.
+        # Results are sorted per SR by date descending:
+        # first hit = latest applicable version.
         if sr not in result:
             result[sr] = (date, url)
     return result
@@ -129,23 +128,23 @@ def download(url, target: Path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Fedlex-Kernerlasse als PDF laden")
+    parser = argparse.ArgumentParser(description="Download core Swiss federal acts as PDFs from Fedlex")
     parser.add_argument("--lang", default="de", choices=sorted(LANG_URI),
-                        help="Sprache der Erlasse (Standard: de)")
+                        help="Language of the acts (default: de)")
     parser.add_argument("--outdir", default="fedlex_pdfs",
-                        help="Zielverzeichnis (Standard: ./fedlex_pdfs)")
+                        help="Target directory (default: ./fedlex_pdfs)")
     parser.add_argument("--delay", type=float, default=1.0,
-                        help="Pause in Sekunden zwischen Downloads (Standard: 1.0)")
+                        help="Pause in seconds between downloads (default: 1.0)")
     args = parser.parse_args()
 
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Löse PDF-URLs für {len(LAWS)} Erlasse auf (Sprache: {args.lang}) ...")
+    print(f"Resolving PDF URLs for {len(LAWS)} acts (language: {args.lang}) ...")
     try:
         urls = resolve_pdf_urls(list(LAWS), LANG_URI[args.lang])
     except Exception as e:
-        sys.exit(f"SPARQL-Abfrage fehlgeschlagen: {e}")
+        sys.exit(f"SPARQL query failed: {e}")
 
     missing = [sr for sr in LAWS if sr not in urls]
     ok, failed = 0, []
@@ -155,22 +154,22 @@ def main():
             continue
         date, url = urls[sr]
         target = outdir / f"SR_{sr}_{abbr}_{args.lang}.pdf"
-        print(f"  SR {sr:>8} ({abbr:6}) Stand {date}: {url}")
+        print(f"  SR {sr:>8} ({abbr:6}) as of {date}: {url}")
         try:
             download(url, target)
             ok += 1
         except Exception as e:
             failed.append((sr, str(e)))
-            print(f"    FEHLER: {e}")
+            print(f"    ERROR: {e}")
         time.sleep(args.delay)
 
-    print(f"\nFertig: {ok} von {len(LAWS)} PDFs in {outdir.resolve()}")
+    print(f"\nDone: {ok} of {len(LAWS)} PDFs in {outdir.resolve()}")
     if missing:
-        print(f"Keine PDF-URL gefunden für SR: {', '.join(missing)}")
-        print("(Mögliche Ursachen: Sprache nicht verfügbar – z. B. Englisch nur "
-              "für einzelne Erlasse – oder abweichende Taxonomie-Notation.)")
+        print(f"No PDF URL found for SR: {', '.join(missing)}")
+        print("(Possible causes: language not available - e.g. English exists "
+              "only for selected acts - or a differing taxonomy notation.)")
     if failed:
-        print("Download fehlgeschlagen für:")
+        print("Download failed for:")
         for sr, err in failed:
             print(f"  SR {sr}: {err}")
 
