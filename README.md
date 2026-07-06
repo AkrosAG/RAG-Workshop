@@ -64,11 +64,25 @@ RAG_COLLECTION=rag_semantic poetry run python rag-2b-chat.py "..."
 RAG_COLLECTION=rag_semantic poetry run python rag-3b-chat.py "..."
 ```
 
-## Endpoint wählen (`.env`)
+## Endpoint wählen (`.env`) — Key bleibt ausserhalb
 
-Default ist ein **lokales Ollama** (kein Key). Für einen anderen OpenAI-kompatiblen
-Endpoint — z. B. einen internen LiteLLM-Proxy — `LLM_BASE_URL` / `LLM_API_KEY` /
-`LLM_MODEL` / `EMBED_MODEL` in `.env` setzen (siehe `.env.example`).
+`.env` enthält nur **Nicht-Geheimes**: `LLM_BASE_URL`, `LLM_MODEL`, `EMBED_MODEL`
+(siehe `.env.example`). Default ist ein lokales Ollama — dafür braucht es keinen Key.
+
+Der **API-Key wird nie in eine Datei geschrieben**. Für einen Endpoint mit Key
+(z. B. einen internen LiteLLM-Proxy) setzt du ihn einmal pro Shell-Session:
+
+```powershell
+.\set-key.ps1                 # PowerShell — fragt verdeckt ab, gilt für die Session
+```
+
+```bash
+source set-key.sh             # bash/zsh — MUSS gesourced werden
+```
+
+Danach erben alle `python`/`poetry`-Aufrufe aus dieser Shell den Key; beim
+Schliessen der Shell ist er weg. `python-dotenv` überschreibt gesetzte
+Umgebungsvariablen nicht — der Session-Key gewinnt also immer.
 
 ## Projektstruktur
 
