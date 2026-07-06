@@ -35,7 +35,20 @@ Voraussetzung: Python ≥ 3.10, [Poetry](https://python-poetry.org/) und ein lau
 ollama pull llama3.2 && ollama pull bge-m3
 poetry install
 cp .env.example .env          # Windows: copy .env.example .env
+```
 
+Ohne Poetry geht es auch mit einem klassischen venv + `requirements.txt`:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Dann die Stufen der Reihe nach (mit venv statt Poetry: `python ...` direkt):
+
+```bash
 poetry run python rag-1-chat.py "Why is the sky blue?"      # 1: Backbone
 poetry run python rag-2a-ingest.py                            # 2a: Index bauen
 poetry run python rag-2b-chat.py "What is a vector database?" # 2b: RAG
