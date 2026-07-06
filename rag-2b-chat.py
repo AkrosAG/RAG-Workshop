@@ -19,6 +19,9 @@ from openai import OpenAI
 
 load_dotenv()
 
+# Minimal error handling: print one line instead of a stack trace.
+sys.excepthook = lambda exc_type, exc, _: sys.exit(f"{exc_type.__name__}: {exc}")
+
 # --- Configuration (as in rag-1/2a) ---
 CHAT_MODEL = os.getenv("LLM_MODEL", "llama3.2")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")

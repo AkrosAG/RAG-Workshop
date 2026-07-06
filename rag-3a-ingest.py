@@ -18,6 +18,7 @@ Run:  poetry run python rag-3a-ingest.py
 
 import os
 import re
+import sys
 from pathlib import Path
 
 import chromadb
@@ -25,6 +26,9 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 load_dotenv()
+
+# Minimal error handling: print one line instead of a stack trace.
+sys.excepthook = lambda exc_type, exc, _: sys.exit(f"{exc_type.__name__}: {exc}")
 
 # --- Configuration (as in rag-2a, but its own collection) ---
 EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
