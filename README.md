@@ -1,30 +1,31 @@
-# RAG-Demo — Knowledge-Worker in einem Skript
+# RAG-Workshop — vom Chat-Backbone zum verfeinerten RAG
 
-Minimales, vollständiges RAG: **`rag.py`** durchläuft drei Stages, jede idempotent —
-laden/embedden, LLM verbinden, Frage beantworten. Kein Framework, kein lokaler
-ML-Stack: Embeddings **und** Generierung laufen über **einen** OpenAI-kompatiblen
-Endpoint (lokales Ollama oder ein interner LiteLLM-Proxy). ~40 Zeilen, die man ganz liest.
-
-## Die drei Stages in `rag.py`
-
-1. **Ingest** — Dokumente fix chunken, über den Endpoint embedden, in Chroma ablegen.
-   *Idempotent:* nur fehlende Chunks werden embedded; ein zweiter Lauf macht nichts.
-2. **Verbindung** — ein OpenAI-Client für Embeddings und Chat.
-3. **RAG-Abfrage** — Frage embedden → ähnlichste Chunks holen → Prompt bauen → Antwort.
-
-Der Vektor-Store (Chroma) ist lokal und file-based — der einzige „lokale" Teil.
-
-## Projektstruktur
+Didaktische Progression in fünf kleinen Skripten: Jedes baut sichtbar auf dem
+vorigen auf — gleiche Konfiguration, gleiche Struktur, pro Stufe kommt genau
+ein Konzept dazu. Kein Framework, keine Blackbox.
 
 ```
-rag-demo/
-├── data/                     # neutraler Beispiel-Datensatz (3 Markdown-Dokumente)
-├── notebooks/
-│   └── 01_rag-zu-fuss.ipynb  # dieselben Stages als Schritt-für-Schritt-Notebook (mit Lücke)
-├── rag.py                    # das ganze RAG in einem idempotenten Skript
-├── pyproject.toml            # Abhängigkeiten (Poetry): chromadb, openai, python-dotenv
-└── poetry.lock
+rag-1-chat.py          Backbone: Modell anbinden, einen Prompt absetzen
+   │
+rag-2a-ingest.py       + Ingest: Fixed-Size-Chunking → Embedding-DB (Chroma, file-based)
+rag-2b-chat.py         + Retrieval: Abfrage mit passenden Chunks anreichern (= RAG)
+   │
+rag-3a-ingest.py       Verfeinerung Ingest: semantisches Chunking (Absätze/Überschriften)
+rag-3b-chat.py         Verfeinerung Retrieval: Over-Fetch + LLM-Re-Ranking
 ```
+
+## Die Stufen
+
+| Skript | Baut auf | Neu |
+|---|---|---|
+| `rag-1-chat.py` | — | OpenAI-kompatibler Client, eine Chat-Anfrage |
+| `rag-2a-ingest.py` | rag-1 | `chunk()` (fix), `embed()`, idempotentes Befüllen von Chroma (`rag_fixed`) |
+| `rag-2b-chat.py` | rag-1 + 2a | Frage embedden → Top-K-Chunks holen → als Kontext in den Prompt |
+| `rag-3a-ingest.py` | rag-2a | nur `chunk()` geändert: struktur-/absatzbewusst (Collection `rag_semantic`) |
+| `rag-3b-chat.py` | rag-2b | Over-Fetch (Top-10) + Re-Ranking durch das Chat-Modell → beste 4 |
+
+Alle Ingests sind **idempotent**: nur fehlende Chunks werden embedded, ein
+zweiter Lauf tut nichts.
 
 ## Schnellstart
 
@@ -34,11 +35,21 @@ Voraussetzung: Python ≥ 3.10, [Poetry](https://python-poetry.org/) und ein lau
 ollama pull llama3.2 && ollama pull bge-m3
 poetry install
 cp .env.example .env          # Windows: copy .env.example .env
-poetry run python rag.py "What is a vector database?"
+
+poetry run python rag-1-chat.py "Why is the sky blue?"      # 1: Backbone
+poetry run python rag-2a-ingest.py                            # 2a: Index bauen
+poetry run python rag-2b-chat.py "What is a vector database?" # 2b: RAG
+poetry run python rag-3a-ingest.py                            # 3a: semantischer Index
+poetry run python rag-3b-chat.py "What is a vector database?" # 3b: mit Re-Ranking
 ```
 
-Der erste Lauf baut den Index und antwortet; jeder weitere überspringt den
-Ingest („up to date") und antwortet direkt.
+Beide Chat-Skripte können auf beide Indizes zeigen — so lassen sich die
+Chunking-Strategien direkt vergleichen:
+
+```bash
+RAG_COLLECTION=rag_semantic poetry run python rag-2b-chat.py "..."
+RAG_COLLECTION=rag_semantic poetry run python rag-3b-chat.py "..."
+```
 
 ## Endpoint wählen (`.env`)
 
@@ -46,9 +57,21 @@ Default ist ein **lokales Ollama** (kein Key). Für einen anderen OpenAI-kompati
 Endpoint — z. B. einen internen LiteLLM-Proxy — `LLM_BASE_URL` / `LLM_API_KEY` /
 `LLM_MODEL` / `EMBED_MODEL` in `.env` setzen (siehe `.env.example`).
 
+## Projektstruktur
+
+```
+rag-demo/
+├── data/                     # neutraler Beispiel-Datensatz (3 Markdown-Dokumente)
+├── notebooks/
+│   └── 01_rag-zu-fuss.ipynb  # die Stufen 1–2b als Schritt-für-Schritt-Notebook (mit Lücke)
+├── rag-1-chat.py … rag-3b-chat.py
+├── pyproject.toml            # Abhängigkeiten (Poetry): chromadb, openai, python-dotenv
+└── poetry.lock
+```
+
 ## Notebook
 
-`notebooks/01_rag-zu-fuss.ipynb` zeigt dieselben drei Stages Schritt für Schritt,
+`notebooks/01_rag-zu-fuss.ipynb` zeigt die Stufen 1–2b Schritt für Schritt,
 mit einer Lücke beim Chunking zum Selbermachen:
 
 ```bash
@@ -56,14 +79,9 @@ poetry install --with notebook
 poetry run jupyter lab
 ```
 
-## Stellschrauben
+## Weiterführende Ideen (Workshop Block 2)
 
-- In `rag.py`: `CHUNK_SIZE` (fixe Chunk-Grösse), `TOP_K` (Anzahl abgerufener Chunks).
-- In `.env`: `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` / `EMBED_MODEL`.
-
-## Ausblick Block 2 (Wahlmodul)
-
-- **Chunking** mit Overlap oder satz-/absatzbewusst statt fix.
-- **Reranking** der abgerufenen Kandidaten.
-- **Query Rewriting** der Frage vor dem Embedden.
-- **Evaluation** der Antwortqualität gegen Referenzfragen.
+- **Chunking:** Overlap in `rag-2a`, andere Budgets, AST-basiert für Quellcode.
+- **Re-Ranking:** dedizierter Cross-Encoder statt LLM-Judge.
+- **Query Rewriting:** die Frage vor dem Embedden umformulieren/erweitern.
+- **Evaluation:** beide Indizes und beide Retrieval-Varianten gegen Referenzfragen messen.
