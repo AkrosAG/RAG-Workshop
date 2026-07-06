@@ -15,3 +15,6 @@ uv.lock
 .DS_Store
 .vscode/
 .idea/
+
+# Downloaded corpus (reproducible via scripts/fedlex_download.py)
+scripts/fedlex_pdfs/
