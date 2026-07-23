@@ -135,12 +135,16 @@ wie viele Vektor-Treffer und Graph-Chunks in den Kontext gelangen.
 
 ## Evaluation: Vector-RAG vs. GraphRAG
 
-`evaluation/questions.json` enthält Referenzfragen mit erwarteten Quellen und
-Begriffen. `evaluate.py` vergleicht beide Retrieval-Varianten anhand von:
+`evaluation/questions.json` enthält Referenzfragen mit erwarteten Quellen,
+Artikeln, Referenzantworten und atomaren Pflichtfakten. `evaluate.py` lässt
+beide Retrieval-Varianten mit demselben Chat-Modell antworten und vergleicht:
 
-- Quellen-Recall,
-- Abdeckung erwarteter Begriffe,
+- Quellen-Recall, Article Hit@K, Article Recall@K und Article MRR,
+- Faktenabdeckung der generierten Antwort,
+- Korrektheit und Vollständigkeit der Quellen-/Artikelangaben,
+- Abdeckung erwarteter Begriffe als reine Retrieval-Diagnose,
 - geschätzten Kontext-Tokens,
+- geschätzten Antwort-Tokens,
 - Tokenersparnis gegenüber dem vollständigen Korpus.
 
 ```bash
@@ -150,6 +154,10 @@ poetry run python evaluate.py
 Der generierte Bericht landet unter `evaluation/report.md` und wird nicht
 versioniert. Die Tokenzahl wird näherungsweise als `Zeichen / 4` berechnet.
 Das ist keine Abrechnungsmetrik, eignet sich aber für den relativen Vergleich.
+Pro Referenzfrage werden zwei Chat-Anfragen ausgeführt: eine für Vector-RAG
+und eine für GraphRAG. Die Bewertung selbst ist deterministisch und verwendet
+keinen zusätzlichen LLM-Judge. `Term Coverage` wird ausdrücklich nicht als
+Antwortqualität interpretiert.
 
 Die strategische Perspektive ist Teil des Reports: RAG spart Tokens gegenüber
 dem vollständigen Kontext. Vector-RAG und GraphRAG verwenden standardmässig
