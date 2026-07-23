@@ -133,10 +133,18 @@ def main() -> None:
     parser.add_argument(
         "--collection", default=os.getenv("RAG_COLLECTION", "rag_semantic")
     )
-    parser.add_argument("--vector-k", type=int, default=4)
+    parser.add_argument(
+        "--context-k",
+        type=int,
+        default=4,
+        help="Shared chunk budget for Vector-RAG and GraphRAG (default: 4).",
+    )
     parser.add_argument("--graph-seed-k", type=int, default=3)
-    parser.add_argument("--graph-context-k", type=int, default=6)
     args = parser.parse_args()
+    if args.context_k < 1:
+        parser.error("--context-k must be at least 1")
+    if not 1 <= args.graph_seed_k <= args.context_k:
+        parser.error("--graph-seed-k must be between 1 and --context-k")
 
     client = OpenAI(
         base_url=os.getenv("LLM_BASE_URL", "http://localhost:11434/v1"),
@@ -159,13 +167,13 @@ def main() -> None:
             model=embed_model, input=[case["question"]]
         ).data[0].embedding
         methods = {
-            "vector": vector_retrieve(collection, embedding, args.vector_k),
+            "vector": vector_retrieve(collection, embedding, args.context_k),
             "graph": graph_retrieve(
                 collection,
                 embedding,
                 graph,
                 args.graph_seed_k,
-                args.graph_context_k,
+                args.context_k,
             ),
         }
         for method, hits in methods.items():
