@@ -61,6 +61,15 @@ def _definition_article(raw: str, previous_number: int | None) -> str:
     return min(candidates, key=score)
 
 
+def article_definition_candidates(text: str) -> set[str]:
+    """Return all plausible article IDs defined at the start of a text line."""
+    return {
+        candidate
+        for raw_article in ARTICLE_DEFINITION_RE.findall(text)
+        for candidate in _article_candidates(raw_article)
+    }
+
+
 def build_graph(collection: Any) -> dict[str, Any]:
     """Build adjacency from document order and explicit legal article references."""
     result = collection.get(include=["documents", "metadatas"])
