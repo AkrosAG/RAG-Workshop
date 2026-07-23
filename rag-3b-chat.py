@@ -83,11 +83,30 @@ def rerank(question: str, candidates: list[str], keep: int) -> list[int]:
     )
     reply = resp.choices[0].message.content or ""
     match = re.search(r"\[[\d,\s]*\]", reply)  # tolerate chatter around the array
+    order: list[int] = []
     if match:
-        order = [i for i in json.loads(match.group()) if 0 <= i < len(candidates)]
-        if order:
-            return order[:keep]
-    return list(range(keep))  # fallback: keep vector order
+        try:
+            parsed = json.loads(match.group())
+        except (json.JSONDecodeError, TypeError):
+            parsed = []
+        if isinstance(parsed, list):
+            for item in parsed:
+                if (
+                    isinstance(item, int)
+                    and not isinstance(item, bool)
+                    and 0 <= item < len(candidates)
+                    and item not in order
+                ):
+                    order.append(item)
+
+    # Invalid, duplicate or incomplete model output is completed with the
+    # original vector order. This also acts as the full parsing fallback.
+    for index in range(len(candidates)):
+        if len(order) >= min(keep, len(candidates)):
+            break
+        if index not in order:
+            order.append(index)
+    return order
 
 
 best = rerank(question, candidates, TOP_K)
