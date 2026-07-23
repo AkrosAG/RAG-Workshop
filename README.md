@@ -58,30 +58,40 @@ poetry run python rag-3b-chat.py "What is a vector database?" # 3b: mit Re-Ranki
 
 ## Schweizer Gesetze aus Fedlex vorbereiten
 
-Die heruntergeladenen Fedlex-PDFs werden nicht direkt von den Ingest-Skripten
-gelesen. Konvertiere sie zuerst in nachvollziehbares Markdown unter `data/`:
+Die Schweizer Gesetzestexte werden reproduzierbar aus Fedlex aufgebaut:
+
+1. `fedlex_download.py` lädt die aktuell anwendbaren Fassungen als PDF nach
+   `scripts/fedlex_pdfs/`.
+2. `fedlex_pdf_to_md.py` extrahiert und bereinigt den Text und erzeugt
+   `data/SR_*.md`.
+3. Die Ingest-Skripte chunken diese Markdown-Dateien und schreiben die
+   Embeddings nach ChromaDB.
+
+Die heruntergeladenen PDFs, die daraus erzeugten Markdown-Dateien und die
+lokale ChromaDB werden bewusst **nicht in Git versioniert**. Sie bleiben lokal
+erhalten und können mit den folgenden Befehlen jederzeit neu erzeugt werden.
+
+Kompletter Ablauf mit Poetry:
 
 ```bash
+poetry install
+poetry run python scripts/fedlex_download.py --outdir scripts/fedlex_pdfs
 poetry run python scripts/fedlex_pdf_to_md.py
+poetry run python rag-2a-ingest.py
 ```
 
-Mit einem klassischen `.venv` funktioniert derselbe Schritt ohne Poetry:
+Mit einem klassischen `.venv`:
 
 ```bash
+python -m pip install -r requirements.txt
+python scripts/fedlex_download.py --outdir scripts/fedlex_pdfs
 python scripts/fedlex_pdf_to_md.py
+python rag-2a-ingest.py
 ```
 
 Der Konverter lässt die Original-PDFs unverändert, bereinigt typische
 PDF-Zeilentrennungen und ergänzt Seitenmarker. Danach finden `rag-2a-ingest.py`
 und `rag-3a-ingest.py` die erzeugten `data/SR_*.md` automatisch.
-
-Kompletter Ablauf für den Schweizer-Recht-Datensatz:
-
-```bash
-poetry run python scripts/fedlex_download.py --outdir scripts/fedlex_pdfs
-poetry run python scripts/fedlex_pdf_to_md.py
-poetry run python rag-2a-ingest.py
-```
 
 Die Ingestion verarbeitet den großen Rechtskorpus in Batches von 64 Chunks.
 Bei Bedarf lässt sich die Größe über `EMBED_BATCH_SIZE` reduzieren.
