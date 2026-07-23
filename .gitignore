@@ -20,3 +20,4 @@ uv.lock
 scripts/fedlex_pdfs/
 
 data/SR_*.md
+evaluation/report.md

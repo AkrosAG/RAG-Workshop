@@ -1,0 +1,50 @@
+[
+  {
+    "id": "or-probezeit",
+    "question": "Wie lange dauert die Probezeit bei einem neuen Arbeitsverhältnis und wie lange kann sie maximal verlängert werden?",
+    "expected_sources": ["SR_220_OR_de.md"],
+    "expected_terms": ["probezeit", "erster monat", "drei monate"]
+  },
+  {
+    "id": "or-ueberstunden",
+    "question": "Unter welchen Voraussetzungen muss ein Arbeitnehmer Überstunden leisten und wie können sie kompensiert werden?",
+    "expected_sources": ["SR_220_OR_de.md"],
+    "expected_terms": ["überstundenarbeit", "zugemutet", "freizeit"]
+  },
+  {
+    "id": "dsg-auskunft",
+    "question": "Kann eine Person verlangen zu erfahren, ob Personendaten über sie bearbeitet werden?",
+    "expected_sources": ["SR_235.1_DSG_de.md"],
+    "expected_terms": ["auskunftsrecht", "personendaten", "bearbeitet"]
+  },
+  {
+    "id": "zgb-handlungsfaehigkeit",
+    "question": "Welche Voraussetzungen gelten nach dem ZGB für die Handlungsfähigkeit?",
+    "expected_sources": ["SR_210_ZGB_de.md"],
+    "expected_terms": ["handlungsfähig", "volljährig", "urteilsfähig"]
+  },
+  {
+    "id": "stgb-notwehr",
+    "question": "Unter welchen Voraussetzungen darf ein unmittelbar drohender Angriff als Notwehr abgewehrt werden?",
+    "expected_sources": ["SR_311.0_StGB_de.md"],
+    "expected_terms": ["notwehr", "angriff", "angemessenen"]
+  },
+  {
+    "id": "stpo-unschuldsvermutung",
+    "question": "Was bedeutet die Unschuldsvermutung und wie ist bei unüberwindlichen Zweifeln zu entscheiden?",
+    "expected_sources": ["SR_312.0_StPO_de.md"],
+    "expected_terms": ["unschuldig", "unüberwindliche zweifel", "günstigeren sachlage"]
+  },
+  {
+    "id": "mwst-steuersaetze",
+    "question": "Wie hoch sind der Normalsatz und der reduzierte Mehrwertsteuersatz?",
+    "expected_sources": ["SR_641.20_MWSTG_de.md"],
+    "expected_terms": ["8,1 prozent", "2,6 prozent", "steuersatz"]
+  },
+  {
+    "id": "bv-stpo-vergleich",
+    "question": "Wie wird die Unschuldsvermutung in der Bundesverfassung und in der Strafprozessordnung geregelt?",
+    "expected_sources": ["SR_101_BV_de.md", "SR_312.0_StPO_de.md"],
+    "expected_terms": ["unschuldsvermutung", "rechtskräftigen verurteilung"]
+  }
+]
