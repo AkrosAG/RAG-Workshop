@@ -1,6 +1,6 @@
 # RAG-Workshop — vom Chat-Backbone zum verfeinerten RAG
 
-Didaktische Progression in fünf kleinen Skripten: Jedes baut sichtbar auf dem
+Didaktische Progression in sieben kleinen Skripten: Jedes baut sichtbar auf dem
 vorigen auf — gleiche Konfiguration, gleiche Struktur, pro Stufe kommt genau
 ein Konzept dazu. Kein Framework, keine Blackbox.
 
@@ -12,6 +12,9 @@ rag-2b-chat.py         + Retrieval: Abfrage mit passenden Chunks anreichern (= R
    │
 rag-3a-ingest.py       Verfeinerung Ingest: semantisches Chunking (Absätze/Überschriften)
 rag-3b-chat.py         Verfeinerung Retrieval: Over-Fetch + LLM-Re-Ranking
+   │
+rag-4a-graph.py        Graph: Nachbar-Chunks + explizite Gesetzesverweise
+rag-4b-chat.py         GraphRAG: Vektor-Seeds → Graph-Expansion → Antwort
 ```
 
 ## Die Stufen
@@ -23,6 +26,8 @@ rag-3b-chat.py         Verfeinerung Retrieval: Over-Fetch + LLM-Re-Ranking
 | `rag-2b-chat.py` | rag-1 + 2a | Frage embedden → Top-K-Chunks holen → als Kontext in den Prompt |
 | `rag-3a-ingest.py` | rag-2a | nur `chunk()` geändert: struktur-/absatzbewusst (Collection `rag_semantic`) |
 | `rag-3b-chat.py` | rag-2b | Over-Fetch (Top-10) + Re-Ranking durch das Chat-Modell → beste 4 |
+| `rag-4a-graph.py` | rag-3a | baut einen transparenten Retrieval-Graph aus Nachbarschaft und `Art.`-Verweisen |
+| `rag-4b-chat.py` | rag-4a | erweitert Vektor-Treffer über Graph-Kanten |
 
 Alle Ingests sind **idempotent**: nur fehlende Chunks werden embedded, ein
 zweiter Lauf tut nichts.
@@ -54,6 +59,8 @@ poetry run python rag-2a-ingest.py                            # 2a: Index bauen
 poetry run python rag-2b-chat.py "What is a vector database?" # 2b: RAG
 poetry run python rag-3a-ingest.py                            # 3a: semantischer Index
 poetry run python rag-3b-chat.py "What is a vector database?" # 3b: mit Re-Ranking
+poetry run python rag-4a-graph.py                              # 4a: Graph bauen
+poetry run python rag-4b-chat.py "Wie lange dauert die Probezeit?" # 4b: GraphRAG
 ```
 
 ## Schweizer Gesetze aus Fedlex vorbereiten
@@ -95,6 +102,50 @@ und `rag-3a-ingest.py` die erzeugten `data/SR_*.md` automatisch.
 
 Die Ingestion verarbeitet den großen Rechtskorpus in Batches von 64 Chunks.
 Bei Bedarf lässt sich die Größe über `EMBED_BATCH_SIZE` reduzieren.
+
+## GraphRAG
+
+Die GraphRAG-Stufe verwendet bewusst kein Graph-Framework. Dadurch bleibt die
+Mechanik im Workshop sichtbar:
+
+1. `rag-3a-ingest.py` erzeugt den semantisch gechunkten Chroma-Index.
+2. `rag-4a-graph.py` verbindet aufeinanderfolgende Chunks derselben Quelle und
+   erkannte Gesetzesverweise wie `Art. 25`.
+3. `rag-4b-chat.py` sucht zunächst Vektor-Seeds und ergänzt anschließend
+   relevante Nachbar- und Referenz-Chunks aus dem Graph.
+
+```bash
+poetry run python rag-3a-ingest.py
+poetry run python rag-4a-graph.py
+poetry run python rag-4b-chat.py \
+  "Wie wird die Unschuldsvermutung in BV und StPO geregelt?"
+```
+
+Der Graph wird lokal unter `.chroma/rag_semantic_graph.json` gespeichert und
+nicht versioniert. Mit `GRAPH_SEED_K` und `GRAPH_CONTEXT_K` lässt sich steuern,
+wie viele Vektor-Treffer und Graph-Chunks in den Kontext gelangen.
+
+## Evaluation: Vector-RAG vs. GraphRAG
+
+`evaluation/questions.json` enthält Referenzfragen mit erwarteten Quellen und
+Begriffen. `evaluate.py` vergleicht beide Retrieval-Varianten anhand von:
+
+- Quellen-Recall,
+- Abdeckung erwarteter Begriffe,
+- geschätzten Kontext-Tokens,
+- Tokenersparnis gegenüber dem vollständigen Korpus.
+
+```bash
+poetry run python evaluate.py
+```
+
+Der generierte Bericht landet unter `evaluation/report.md` und wird nicht
+versioniert. Die Tokenzahl wird näherungsweise als `Zeichen / 4` berechnet.
+Das ist keine Abrechnungsmetrik, eignet sich aber für den relativen Vergleich.
+
+Die strategische Perspektive ist Teil des Reports: RAG spart Tokens gegenüber
+dem vollständigen Kontext; GraphRAG darf etwas mehr Kontext verwenden, wenn
+dadurch Quellen-Recall oder Begriffabdeckung messbar steigen.
 
 Beide Chat-Skripte können auf beide Indizes zeigen — so lassen sich die
 Chunking-Strategien direkt vergleichen:
