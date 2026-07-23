@@ -56,6 +56,36 @@ poetry run python rag-3a-ingest.py                            # 3a: semantischer
 poetry run python rag-3b-chat.py "What is a vector database?" # 3b: mit Re-Ranking
 ```
 
+## Schweizer Gesetze aus Fedlex vorbereiten
+
+Die heruntergeladenen Fedlex-PDFs werden nicht direkt von den Ingest-Skripten
+gelesen. Konvertiere sie zuerst in nachvollziehbares Markdown unter `data/`:
+
+```bash
+poetry run python scripts/fedlex_pdf_to_md.py
+```
+
+Mit einem klassischen `.venv` funktioniert derselbe Schritt ohne Poetry:
+
+```bash
+python scripts/fedlex_pdf_to_md.py
+```
+
+Der Konverter lässt die Original-PDFs unverändert, bereinigt typische
+PDF-Zeilentrennungen und ergänzt Seitenmarker. Danach finden `rag-2a-ingest.py`
+und `rag-3a-ingest.py` die erzeugten `data/SR_*.md` automatisch.
+
+Kompletter Ablauf für den Schweizer-Recht-Datensatz:
+
+```bash
+poetry run python scripts/fedlex_download.py --outdir scripts/fedlex_pdfs
+poetry run python scripts/fedlex_pdf_to_md.py
+poetry run python rag-2a-ingest.py
+```
+
+Die Ingestion verarbeitet den großen Rechtskorpus in Batches von 64 Chunks.
+Bei Bedarf lässt sich die Größe über `EMBED_BATCH_SIZE` reduzieren.
+
 Beide Chat-Skripte können auf beide Indizes zeigen — so lassen sich die
 Chunking-Strategien direkt vergleichen:
 
