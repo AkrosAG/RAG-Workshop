@@ -41,6 +41,7 @@ ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
 COLLECTION = "rag_semantic"
 MAX_CHUNK_SIZE = 800  # budget per chunk — a paragraph is never split
+EMBED_BATCH_SIZE = int(os.getenv("EMBED_BATCH_SIZE", "64"))
 
 
 # --- CHANGED vs. rag-2a: structure-aware chunking ---
@@ -69,9 +70,13 @@ def chunk(text: str) -> list[str]:
 
 
 def embed(texts: list[str]) -> list[list[float]]:
-    """As in rag-2a-ingest.py."""
-    resp = client.embeddings.create(model=EMBED_MODEL, input=texts)
-    return [d.embedding for d in resp.data]
+    """As in rag-2a-ingest.py: embed in endpoint-friendly batches."""
+    embeddings: list[list[float]] = []
+    for start in range(0, len(texts), EMBED_BATCH_SIZE):
+        batch = texts[start : start + EMBED_BATCH_SIZE]
+        resp = client.embeddings.create(model=EMBED_MODEL, input=batch)
+        embeddings.extend(d.embedding for d in resp.data)
+    return embeddings
 
 
 # --- Ingest (identical to rag-2a, only chunk() changed) ---
@@ -86,16 +91,20 @@ for path in sorted(DATA.glob("*.md")):
         texts.append(piece)
         metas.append({"source": path.name})
 
-existing = set(collection.get(ids=ids)["ids"])
+existing = set(collection.get(include=[])["ids"])
 missing = [j for j, _id in enumerate(ids) if _id not in existing]
 
 if missing:
-    collection.upsert(
-        ids=[ids[j] for j in missing],
-        embeddings=embed([texts[j] for j in missing]),
-        documents=[texts[j] for j in missing],
-        metadatas=[metas[j] for j in missing],
-    )
+    for start in range(0, len(missing), EMBED_BATCH_SIZE):
+        batch = missing[start : start + EMBED_BATCH_SIZE]
+        batch_texts = [texts[j] for j in batch]
+        collection.upsert(
+            ids=[ids[j] for j in batch],
+            embeddings=embed(batch_texts),
+            documents=batch_texts,
+            metadatas=[metas[j] for j in batch],
+        )
+        print(f"[ingest] embedded {min(start + len(batch), len(missing))}/{len(missing)}")
     print(f"[ingest] added {len(missing)} chunk(s); '{COLLECTION}' now holds {collection.count()}")
 else:
     print(f"[ingest] up to date ('{COLLECTION}': {collection.count()} chunks)")
