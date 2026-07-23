@@ -7,9 +7,16 @@ from pathlib import Path
 from typing import Any
 
 
-ARTICLE_RE = re.compile(r"\bArt\.\s*(\d{1,3}[a-z]?)\b", re.IGNORECASE)
+ARTICLE_RE = re.compile(
+    r"\bArt\.\s*(\d{1,4}(?:(?:bis|ter|quater)|[a-z])?\d*)",
+    re.IGNORECASE,
+)
 ARTICLE_DEFINITION_RE = re.compile(
-    r"(?m)^\s*Art\.\s*(\d{1,3}[a-z]?)\b", re.IGNORECASE
+    r"(?m)^\s*Art\.\s*(\d{1,4}(?:(?:bis|ter|quater)|[a-z])?\d*)",
+    re.IGNORECASE,
+)
+ARTICLE_PARTS_RE = re.compile(
+    r"^(\d{1,4})((?:bis|ter|quater)|[a-z])?(\d*)$", re.IGNORECASE
 )
 
 
@@ -18,6 +25,40 @@ def _chunk_number(chunk_id: str) -> int:
         return int(chunk_id.rsplit("::", 1)[1])
     except (IndexError, ValueError):
         return 0
+
+
+def _article_candidates(raw: str) -> list[str]:
+    """Return plausible article IDs, stripping glued PDF footnote numbers.
+
+    Fedlex extraction can turn ``Art. 5a²`` into ``Art. 5a2`` and
+    ``Art. 7²²`` into ``Art. 722``. Letter suffixes are unambiguous; for
+    digits-only tokens all numeric prefixes remain candidates.
+    """
+    match = ARTICLE_PARTS_RE.fullmatch(raw.casefold())
+    if not match:
+        return []
+    number, suffix, footnote = match.groups()
+    if suffix:
+        return [f"{number}{suffix}"]
+    if footnote:
+        return [number]
+    return [number[:end] for end in range(len(number), 0, -1)]
+
+
+def _definition_article(raw: str, previous_number: int | None) -> str:
+    """Choose the most plausible definition using the document's article order."""
+    candidates = _article_candidates(raw)
+    if not candidates or previous_number is None:
+        return candidates[0] if candidates else raw.casefold()
+
+    def score(candidate: str) -> tuple[int, int]:
+        number = int(re.match(r"\d+", candidate).group())
+        # Articles normally stay at the same number for letter suffixes or
+        # advance by one. Prefer that over a glued footnote interpretation.
+        delta = number - previous_number
+        return (0 if delta >= 0 else 1, abs(delta))
+
+    return min(candidates, key=score)
 
 
 def build_graph(collection: Any) -> dict[str, Any]:
@@ -46,18 +87,28 @@ def build_graph(collection: Any) -> dict[str, Any]:
     # possible, because article numbers repeat across different laws.
     definitions: dict[tuple[str, str], str] = {}
     global_definitions: dict[str, list[str]] = defaultdict(list)
-    for chunk_id, text in documents_by_id.items():
-        source = metadata_by_id[chunk_id].get("source", "unknown")
-        for article in ARTICLE_DEFINITION_RE.findall(text):
-            key = article.lower()
-            definitions.setdefault((source, key), chunk_id)
-            if chunk_id not in global_definitions[key]:
-                global_definitions[key].append(chunk_id)
+    for source, source_ids in by_source.items():
+        previous_number: int | None = None
+        for chunk_id in sorted(source_ids, key=_chunk_number):
+            for raw_article in ARTICLE_DEFINITION_RE.findall(
+                documents_by_id[chunk_id]
+            ):
+                key = _definition_article(raw_article, previous_number)
+                previous_number = int(re.match(r"\d+", key).group())
+                definitions.setdefault((source, key), chunk_id)
+                if chunk_id not in global_definitions[key]:
+                    global_definitions[key].append(chunk_id)
 
     reference_edges = 0
     for chunk_id, text in documents_by_id.items():
         source = metadata_by_id[chunk_id].get("source", "unknown")
-        for article in set(a.lower() for a in ARTICLE_RE.findall(text)):
+        raw_articles = ARTICLE_RE.findall(text)
+        article_candidates = {
+            candidate
+            for raw_article in raw_articles
+            for candidate in _article_candidates(raw_article)
+        }
+        for article in article_candidates:
             targets = []
             local_target = definitions.get((source, article))
             if local_target:
