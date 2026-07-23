@@ -34,12 +34,16 @@ zweiter Lauf tut nichts.
 
 ## Schnellstart
 
-Voraussetzung: Python ≥ 3.10, [Poetry](https://python-poetry.org/) und ein laufendes [Ollama](https://ollama.com/).
+Voraussetzung: Python ≥ 3.10, [Poetry](https://python-poetry.org/), eine
+Verbindung zum AKROS-VPN und ein Marvin-API-Key mit Zugriff auf die
+konfigurierten Chat- und Embedding-Modelle.
 
 ```bash
-ollama pull llama3.2 && ollama pull bge-m3
 poetry install
 cp .env.example .env          # Windows: copy .env.example .env
+# danach den Key für die aktuelle Shell setzen:
+# PowerShell: .\set-key.ps1
+# Bash: source ./set-key.sh
 ```
 
 Ohne Poetry geht es auch mit einem klassischen venv + `requirements.txt`:
@@ -78,7 +82,7 @@ Die heruntergeladenen PDFs, die daraus erzeugten Markdown-Dateien und die
 lokale ChromaDB werden bewusst **nicht in Git versioniert**. Sie bleiben lokal
 erhalten und können mit den folgenden Befehlen jederzeit neu erzeugt werden.
 
-Kompletter Ablauf mit Poetry:
+Kompletter Ablauf mit Poetry für die Demonstration von Fixed-Size-Chunking:
 
 ```bash
 poetry install
@@ -87,7 +91,7 @@ poetry run python scripts/fedlex_pdf_to_md.py
 poetry run python rag-2a-ingest.py
 ```
 
-Mit einem klassischen `.venv`:
+Mit einem klassischen `.venv` für dieselbe Fixed-Size-Demonstration:
 
 ```bash
 python -m pip install -r requirements.txt
@@ -121,6 +125,10 @@ poetry run python rag-4b-chat.py \
   "Wie wird die Unschuldsvermutung in BV und StPO geregelt?"
 ```
 
+`rag-2a-ingest.py` und `rag-2b-chat.py` sind eine eigenständige didaktische
+Stufe für Fixed-Size-Chunking. Sie sind weder Voraussetzung für GraphRAG noch
+Teil der Vector-RAG-vs.-GraphRAG-Evaluation.
+
 Der Graph wird lokal unter `.chroma/rag_semantic_graph.json` gespeichert und
 nicht versioniert. Mit `GRAPH_SEED_K` und `GRAPH_CONTEXT_K` lässt sich steuern,
 wie viele Vektor-Treffer und Graph-Chunks in den Kontext gelangen.
@@ -144,8 +152,10 @@ versioniert. Die Tokenzahl wird näherungsweise als `Zeichen / 4` berechnet.
 Das ist keine Abrechnungsmetrik, eignet sich aber für den relativen Vergleich.
 
 Die strategische Perspektive ist Teil des Reports: RAG spart Tokens gegenüber
-dem vollständigen Kontext; GraphRAG darf etwas mehr Kontext verwenden, wenn
-dadurch Quellen-Recall oder Begriffabdeckung messbar steigen.
+dem vollständigen Kontext. Vector-RAG und GraphRAG verwenden standardmässig
+dasselbe Budget von vier Chunks (`--context-k`), damit der Vergleich fair
+bleibt. `--graph-seed-k` bestimmt, wie viele davon zunächst über die
+Vektorsuche gewählt werden.
 
 Beide Chat-Skripte können auf beide Indizes zeigen — so lassen sich die
 Chunking-Strategien direkt vergleichen:
@@ -158,7 +168,8 @@ RAG_COLLECTION=rag_semantic poetry run python rag-3b-chat.py "..."
 ## Endpoint wählen (`.env`) — Key bleibt ausserhalb
 
 `.env` enthält nur **Nicht-Geheimes**: `LLM_BASE_URL`, `LLM_MODEL`, `EMBED_MODEL`
-(siehe `.env.example`). Default ist ein lokales Ollama — dafür braucht es keinen Key.
+(siehe `.env.example`). Konfiguriert ist Marvin; der Endpoint ist nur über das
+AKROS-VPN erreichbar und benötigt einen passenden API-Key.
 
 Der **API-Key wird nie in eine Datei geschrieben**. Für einen Endpoint mit Key
 (z. B. einen internen LiteLLM-Proxy) setzt du ihn einmal pro Shell-Session:
