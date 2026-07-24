@@ -4,8 +4,8 @@ Builds on rag-1-chat.py: same client and configuration; new is the ingest
 pipeline — read documents, cut them into fixed-size chunks, embed each chunk
 via the endpoint, and store everything in a local file-based Chroma collection.
 
-Idempotent (desired-state): only chunks missing from the store get embedded;
-re-running with an unchanged corpus does nothing.
+Idempotent (desired-state): new and changed chunks are embedded, obsolete
+chunks are removed, and re-running with an unchanged corpus does nothing.
 
 Run:  poetry run python rag-2a-ingest.py
 """
@@ -59,20 +59,30 @@ collection = chromadb.PersistentClient(path=str(ROOT / ".chroma")).get_or_create
     COLLECTION, embedding_function=None, metadata={"hnsw:space": "cosine"}
 )
 
-# Collect all chunks with deterministic ids, then embed only what is missing.
+# Collect all chunks with deterministic IDs, then synchronize changed,
+# missing and obsolete chunks with the desired corpus state.
 ids, texts, metas = [], [], []
 for path in sorted(DATA.glob("*.md")):
     for n, piece in enumerate(chunk(path.read_text(encoding="utf-8"))):
         ids.append(f"{path.name}::{n}")
         texts.append(piece)
-        metas.append({"source": path.name})
+        metas.append({"source": path.name, "embed_model": EMBED_MODEL})
 
-existing = set(collection.get(include=[])["ids"])
-missing = [j for j, _id in enumerate(ids) if _id not in existing]
+stored = collection.get(include=["documents", "metadatas"])
+existing_documents = dict(zip(stored["ids"], stored["documents"]))
+existing_metadatas = dict(zip(stored["ids"], stored["metadatas"]))
+changed = [
+    j for j, chunk_id in enumerate(ids)
+    if (
+        existing_documents.get(chunk_id) != texts[j]
+        or existing_metadatas.get(chunk_id, {}).get("embed_model") != EMBED_MODEL
+    )
+]
+obsolete = sorted(set(existing_documents) - set(ids))
 
-if missing:
-    for start in range(0, len(missing), EMBED_BATCH_SIZE):
-        batch = missing[start : start + EMBED_BATCH_SIZE]
+if changed:
+    for start in range(0, len(changed), EMBED_BATCH_SIZE):
+        batch = changed[start : start + EMBED_BATCH_SIZE]
         batch_texts = [texts[j] for j in batch]
         collection.upsert(
             ids=[ids[j] for j in batch],
@@ -80,7 +90,16 @@ if missing:
             documents=batch_texts,
             metadatas=[metas[j] for j in batch],
         )
-        print(f"[ingest] embedded {min(start + len(batch), len(missing))}/{len(missing)}")
-    print(f"[ingest] added {len(missing)} chunk(s); '{COLLECTION}' now holds {collection.count()}")
+        print(f"[ingest] embedded {min(start + len(batch), len(changed))}/{len(changed)}")
+if obsolete:
+    for start in range(0, len(obsolete), 500):
+        collection.delete(ids=obsolete[start : start + 500])
+
+if changed or obsolete:
+    print(
+        f"[ingest] synchronized {len(changed)} changed/new and "
+        f"removed {len(obsolete)} obsolete chunk(s); "
+        f"'{COLLECTION}' now holds {collection.count()}"
+    )
 else:
     print(f"[ingest] up to date ('{COLLECTION}': {collection.count()} chunks)")
