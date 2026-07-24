@@ -1,4 +1,7 @@
-"""Stage 4b - GraphRAG chat: vector seeds plus graph-neighbour expansion.
+"""Stage 4b - Hybrid GraphRAG chat.
+
+Merges semantic vector seeds with lexically matched legal articles, then adds
+graph neighbours and reference targets.
 
 Run rag-3a-ingest.py and rag-4a-graph.py first.
 
@@ -13,7 +16,13 @@ import chromadb
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from graph_retrieval import estimate_tokens, graph_retrieve, load_graph
+from graph_retrieval import (
+    GRAPH_VERSION,
+    build_article_index,
+    estimate_tokens,
+    graph_retrieve,
+    load_graph,
+)
 
 
 load_dotenv()
@@ -25,6 +34,7 @@ GRAPH_PATH = ROOT / ".chroma" / f"{COLLECTION}_graph.json"
 CHAT_MODEL = os.getenv("LLM_MODEL", "llama3.2")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
 SEED_K = int(os.getenv("GRAPH_SEED_K", "3"))
+ARTICLE_K = int(os.getenv("GRAPH_ARTICLE_K", "2"))
 CONTEXT_K = int(os.getenv("GRAPH_CONTEXT_K", "6"))
 
 client = OpenAI(
@@ -37,8 +47,23 @@ collection = chromadb.PersistentClient(path=str(ROOT / ".chroma")).get_collectio
     COLLECTION, embedding_function=None
 )
 graph = load_graph(GRAPH_PATH)
+if graph.get("version") != GRAPH_VERSION:
+    sys.exit(
+        "Graph format is outdated. Rebuild it with: "
+        "poetry run python rag-4a-graph.py"
+    )
 embedding = client.embeddings.create(model=EMBED_MODEL, input=[question]).data[0].embedding
-hits = graph_retrieve(collection, embedding, graph, SEED_K, CONTEXT_K)
+article_index = build_article_index(collection, graph)
+hits = graph_retrieve(
+    collection=collection,
+    query_embedding=embedding,
+    graph=graph,
+    question=question,
+    article_index=article_index,
+    seed_limit=SEED_K,
+    article_limit=ARTICLE_K,
+    context_limit=CONTEXT_K,
+)
 
 context_parts = []
 for hit in hits:
