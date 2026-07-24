@@ -14,7 +14,8 @@ from statistics import mean
 from typing import Any
 
 from graph_retrieval import (
-    article_definition_candidates,
+    GRAPH_VERSION,
+    build_article_index,
     estimate_tokens,
     graph_retrieve,
     load_graph,
@@ -26,7 +27,9 @@ sys.excepthook = lambda exc_type, exc, _: sys.exit(f"{exc_type.__name__}: {exc}"
 ROOT = Path(__file__).resolve().parent
 CITATION_RE = re.compile(
     r"\[(?P<source>SR_[^\]\s]+\.md)\s+Art\.\s*"
-    r"(?P<article>\d{1,4}(?:(?:bis|ter|quater)|[a-z])?)\]",
+    r"(?P<article>\d+(?:(?:bis|ter|quater)|[a-z])?\d*)"
+    r"(?P<range>\s*[-–—]\s*\d+(?:(?:bis|ter|quater)|[a-z])?\d*)?"
+    r"(?:\s+[^\]]*)?\]",
     re.IGNORECASE,
 )
 
@@ -43,28 +46,34 @@ def expected_article_pairs(case: dict[str, Any]) -> set[tuple[str, str]]:
 
 
 def article_rank(
-    hits: list[dict[str, Any]], expected_source: str, expected_article: str
+    hits: list[dict[str, Any]],
+    expected_source: str,
+    expected_article: str,
+    article_definitions: dict[str, list[str]],
 ) -> int | None:
     """Return the one-based rank of an expected article definition."""
     for rank, hit in enumerate(hits, start=1):
         source = hit["metadata"].get("source", "")
-        definitions = article_definition_candidates(hit["document"])
+        definitions = article_definitions.get(hit["id"], [])
         if source.casefold() == expected_source and expected_article in definitions:
             return rank
     return None
 
 
 def score_retrieval(
-    case: dict[str, Any], hits: list[dict[str, Any]]
+    case: dict[str, Any],
+    hits: list[dict[str, Any]],
+    article_definitions: dict[str, list[str]],
 ) -> dict[str, float]:
     sources = {hit["metadata"].get("source", "") for hit in hits}
     expected_sources = set(case["expected_sources"])
     expected_articles = expected_article_pairs(case)
     ranks = [
-        article_rank(hits, source, article)
+        article_rank(hits, source, article, article_definitions)
         for source, article in sorted(expected_articles)
     ]
-    context = normalized("\n".join(hit["document"] for hit in hits))
+    document_context = normalized("\n".join(hit["document"] for hit in hits))
+    prompt_context = render_context(hits)
     expected_terms = [normalized(term) for term in case["expected_terms"]]
 
     return {
@@ -84,11 +93,13 @@ def score_retrieval(
         ),
         # Diagnostic only: this describes retrieved vocabulary, not answer quality.
         "term_coverage": (
-            sum(term in context for term in expected_terms) / len(expected_terms)
+            sum(term in document_context for term in expected_terms)
+            / len(expected_terms)
             if expected_terms
             else 1.0
         ),
-        "context_tokens": estimate_tokens(context),
+        "document_context_tokens": estimate_tokens(document_context),
+        "prompt_context_tokens": estimate_tokens(prompt_context),
     }
 
 
@@ -130,29 +141,129 @@ def answer_question(
 
 
 def cited_article_pairs(answer: str) -> set[tuple[str, str]]:
+    pairs: set[tuple[str, str]] = set()
+    for match in CITATION_RE.finditer(answer):
+        source = match.group("source").casefold()
+        start = normalized_cited_article(match.group("article"))
+        range_text = match.group("range")
+        if not range_text:
+            pairs.add((source, start))
+            continue
+
+        end_raw = re.sub(r"^\s*[-–—]\s*", "", range_text)
+        end = normalized_cited_article(end_raw)
+        start_match = re.fullmatch(r"(\d+)([a-z]+)?", start)
+        end_match = re.fullmatch(r"(\d+)([a-z]+)?", end)
+        if (
+            start_match
+            and end_match
+            and not start_match.group(2)
+            and not end_match.group(2)
+        ):
+            first, last = int(start), int(end)
+            if first <= last <= first + 50:
+                pairs.update((source, str(article)) for article in range(first, last + 1))
+                continue
+        pairs.update({(source, start), (source, end)})
+    return pairs
+
+
+def normalized_cited_article(raw: str) -> str:
+    """Remove footnote digits glued to a cited Fedlex article number."""
+    value = raw.casefold()
+    letter_match = re.fullmatch(
+        r"(\d{1,4})((?:bis|ter|quater)|[a-z])\d*", value
+    )
+    if letter_match:
+        return "".join(letter_match.groups())
+    # Four digits can be a genuine article number (the OR reaches Art. 1186).
+    # Five or more digits are a PDF footnote glued to a one- to four-digit
+    # article; the corpus' observed form uses a three-digit base here.
+    if value.isdigit() and len(value) > 4:
+        return value[:3]
+    return value
+
+
+def contains_non_negated(text: str, phrase: str) -> bool:
+    """Return true when a phrase occurs without negation in its clause."""
+    phrase = normalized(phrase)
+    negations = {
+        "falsch",
+        "kein",
+        "keine",
+        "keinen",
+        "keinem",
+        "keiner",
+        "keinesfalls",
+        "nicht",
+        "nie",
+        "unwahr",
+        "weder",
+    }
+    start = 0
+    while (index := text.find(phrase, start)) >= 0:
+        clause_start = max(
+            text.rfind(separator, 0, index) for separator in ".!?;"
+        )
+        comma = text.rfind(",", clause_start + 1, index)
+        after_comma = text[comma + 1 : index].strip() if comma >= 0 else ""
+        if comma >= 0 and not after_comma.startswith(
+            ("dass ", "ob ", "weil ", "wenn ")
+        ):
+            clause_start = comma
+        clause_prefix = text[clause_start + 1 : index]
+        prefix_words = set(
+            re.findall(r"[0-9a-zäöüàâéèêëîïôûüç]+", clause_prefix)
+        )
+        if not (prefix_words & negations):
+            return True
+        start = index + len(phrase)
+    return False
+
+
+def retrieved_article_pairs(
+    hits: list[dict[str, Any]], article_definitions: dict[str, list[str]]
+) -> set[tuple[str, str]]:
     return {
-        (match.group("source").casefold(), match.group("article").casefold())
-        for match in CITATION_RE.finditer(answer)
+        (hit["metadata"].get("source", "").casefold(), article.casefold())
+        for hit in hits
+        for article in article_definitions.get(hit["id"], [])
     }
 
 
-def score_answer(case: dict[str, Any], answer: str) -> dict[str, float]:
+def score_answer(
+    case: dict[str, Any],
+    answer: str,
+    hits: list[dict[str, Any]],
+    article_definitions: dict[str, list[str]],
+) -> dict[str, float]:
     answer_text = normalized(answer)
     required_facts = case["required_facts"]
     covered_facts = [
-        any(normalized(alternative) in answer_text for alternative in fact["alternatives"])
+        all(
+            any(contains_non_negated(answer_text, alternative) for alternative in group)
+            for group in fact["all_of"]
+        )
         for fact in required_facts
     ]
     expected_citations = expected_article_pairs(case)
     actual_citations = cited_article_pairs(answer)
     correct_citations = actual_citations & expected_citations
+    grounded_citations = actual_citations & retrieved_article_pairs(
+        hits, article_definitions
+    )
 
     return {
         "fact_coverage": (
             sum(covered_facts) / len(covered_facts) if covered_facts else 1.0
         ),
-        "citation_accuracy": (
+        "expected_citation_precision": (
             len(correct_citations) / len(actual_citations)
+            if actual_citations
+            else 0.0
+        ),
+        "citation_grounding": (
+            len(grounded_citations) / len(actual_citations)
             if actual_citations
             else 0.0
         ),
@@ -184,15 +295,17 @@ def render_report(
         "",
         "## Retrieval",
         "",
-        "| Question | Method | Source recall | Article Hit@K | Article Recall@K | Article MRR | Term coverage (diagnostic) | Context tokens |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Question | Method | Source recall | Article Hit@K | Article Recall@K | Article MRR | Term coverage (diagnostic) | Document tokens | Prompt-context tokens |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in rows:
         lines.append(
             f"| {row['id']} | {row['method']} | "
             f"{row['source_recall']:.0%} | {row['article_hit_at_k']:.0%} | "
             f"{row['article_recall_at_k']:.0%} | {row['article_mrr']:.2f} | "
-            f"{row['term_coverage']:.0%} | {row['context_tokens']:,} |"
+            f"{row['term_coverage']:.0%} | "
+            f"{row['document_context_tokens']:,} | "
+            f"{row['prompt_context_tokens']:,} |"
         )
 
     lines.extend(
@@ -200,29 +313,35 @@ def render_report(
             "",
             "## Answers",
             "",
-            "| Question | Method | Fact coverage | Citation accuracy | Citation completeness | Answer tokens |",
-            "| --- | --- | ---: | ---: | ---: | ---: |",
+            "| Question | Method | Fact coverage | Expected-citation precision | Citation grounding | Citation completeness | Answer tokens |",
+            "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
         ]
     )
     for row in rows:
         lines.append(
             f"| {row['id']} | {row['method']} | "
-            f"{row['fact_coverage']:.0%} | {row['citation_accuracy']:.0%} | "
+            f"{row['fact_coverage']:.0%} | "
+            f"{row['expected_citation_precision']:.0%} | "
+            f"{row['citation_grounding']:.0%} | "
             f"{row['citation_completeness']:.0%} | {row['answer_tokens']:,} |"
         )
 
     lines.extend(["", "## Summary", ""])
     for method in ("vector", "graph"):
         method_rows = [row for row in rows if row["method"] == method]
-        avg_context_tokens = mean(row["context_tokens"] for row in method_rows)
+        avg_context_tokens = mean(
+            row["prompt_context_tokens"] for row in method_rows
+        )
         savings = 1 - avg_context_tokens / full_corpus_tokens
         lines.append(
             f"- **{method}:** article recall@K "
             f"{mean(row['article_recall_at_k'] for row in method_rows):.1%}, "
             f"MRR {mean(row['article_mrr'] for row in method_rows):.2f}, "
             f"fact coverage {mean(row['fact_coverage'] for row in method_rows):.1%}, "
-            f"citation accuracy "
-            f"{mean(row['citation_accuracy'] for row in method_rows):.1%}, "
+            f"expected-citation precision "
+            f"{mean(row['expected_citation_precision'] for row in method_rows):.1%}, "
+            f"citation grounding "
+            f"{mean(row['citation_grounding'] for row in method_rows):.1%}, "
             f"citation completeness "
             f"{mean(row['citation_completeness'] for row in method_rows):.1%}, "
             f"average context {avg_context_tokens:,.0f} tokens, "
@@ -230,10 +349,10 @@ def render_report(
         )
 
     vector_tokens = mean(
-        row["context_tokens"] for row in rows if row["method"] == "vector"
+        row["prompt_context_tokens"] for row in rows if row["method"] == "vector"
     )
     graph_tokens = mean(
-        row["context_tokens"] for row in rows if row["method"] == "graph"
+        row["prompt_context_tokens"] for row in rows if row["method"] == "graph"
     )
     delta = (graph_tokens - vector_tokens) / vector_tokens
     lines.extend(
@@ -289,15 +408,23 @@ def main() -> None:
     parser.add_argument(
         "--context-k",
         type=int,
-        default=4,
-        help="Shared chunk budget for Vector-RAG and GraphRAG (default: 4).",
+        default=6,
+        help="Shared chunk budget for Vector-RAG and GraphRAG (default: 6).",
     )
     parser.add_argument("--graph-seed-k", type=int, default=3)
+    parser.add_argument(
+        "--article-k",
+        type=int,
+        default=2,
+        help="Lexical article candidates merged into GraphRAG (default: 2).",
+    )
     args = parser.parse_args()
     if args.context_k < 1:
         parser.error("--context-k must be at least 1")
     if not 1 <= args.graph_seed_k <= args.context_k:
         parser.error("--graph-seed-k must be between 1 and --context-k")
+    if not 0 <= args.article_k <= args.context_k:
+        parser.error("--article-k must be between 0 and --context-k")
 
     client = OpenAI(
         base_url=os.getenv("LLM_BASE_URL", "http://localhost:11434/v1"),
@@ -309,6 +436,18 @@ def main() -> None:
         path=str(ROOT / ".chroma")
     ).get_collection(args.collection, embedding_function=None)
     graph = load_graph(ROOT / ".chroma" / f"{args.collection}_graph.json")
+    if graph.get("version") != GRAPH_VERSION:
+        sys.exit(
+            "Graph format is outdated. Rebuild it with: "
+            "poetry run python rag-4a-graph.py"
+        )
+    article_definitions = graph.get("article_definitions")
+    if not isinstance(article_definitions, dict):
+        sys.exit(
+            "Graph has no normalized article definitions. "
+            "Rebuild it with: poetry run python rag-4a-graph.py"
+        )
+    article_index = build_article_index(collection, graph)
     cases = json.loads(args.questions.read_text(encoding="utf-8"))
 
     corpus = collection.get(include=["documents"])
@@ -323,11 +462,14 @@ def main() -> None:
         methods = {
             "vector": vector_retrieve(collection, embedding, args.context_k),
             "graph": graph_retrieve(
-                collection,
-                embedding,
-                graph,
-                args.graph_seed_k,
-                args.context_k,
+                collection=collection,
+                query_embedding=embedding,
+                graph=graph,
+                question=case["question"],
+                article_index=article_index,
+                seed_limit=args.graph_seed_k,
+                article_limit=args.article_k,
+                context_limit=args.context_k,
             ),
         }
         for method, hits in methods.items():
@@ -339,8 +481,8 @@ def main() -> None:
                 "method": method,
                 "answer": answer,
             }
-            row.update(score_retrieval(case, hits))
-            row.update(score_answer(case, answer))
+            row.update(score_retrieval(case, hits, article_definitions))
+            row.update(score_answer(case, answer, hits, article_definitions))
             rows.append(row)
         print(f"[evaluate] {number}/{len(cases)} {case['id']}")
 

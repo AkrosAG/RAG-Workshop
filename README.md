@@ -14,7 +14,7 @@ rag-3a-ingest.py       Verfeinerung Ingest: semantisches Chunking (Absätze/Übe
 rag-3b-chat.py         Verfeinerung Retrieval: Over-Fetch + LLM-Re-Ranking
    │
 rag-4a-graph.py        Graph: Nachbar-Chunks + explizite Gesetzesverweise
-rag-4b-chat.py         GraphRAG: Vektor-Seeds → Graph-Expansion → Antwort
+rag-4b-chat.py         Hybrid GraphRAG: Vektor + Artikelsuche → Graph → Antwort
 ```
 
 ## Die Stufen
@@ -27,10 +27,11 @@ rag-4b-chat.py         GraphRAG: Vektor-Seeds → Graph-Expansion → Antwort
 | `rag-3a-ingest.py` | rag-2a | nur `chunk()` geändert: struktur-/absatzbewusst (Collection `rag_semantic`) |
 | `rag-3b-chat.py` | rag-2b | Over-Fetch (Top-10) + Re-Ranking durch das Chat-Modell → beste 4 |
 | `rag-4a-graph.py` | rag-3a | baut einen transparenten Retrieval-Graph aus Nachbarschaft und `Art.`-Verweisen |
-| `rag-4b-chat.py` | rag-4a | erweitert Vektor-Treffer über Graph-Kanten |
+| `rag-4b-chat.py` | rag-4a | kombiniert Vektor- und lexikalische Artikeltreffer und erweitert sie über Graph-Kanten |
 
-Alle Ingests sind **idempotent**: nur fehlende Chunks werden embedded, ein
-zweiter Lauf tut nichts.
+Alle Ingests sind **idempotent**: neue oder inhaltlich beziehungsweise durch
+einen Modellwechsel veränderte Chunks werden embedded, obsolete Chunks werden
+entfernt und ein unveränderter zweiter Lauf tut nichts.
 
 ## Schnellstart
 
@@ -115,8 +116,13 @@ Mechanik im Workshop sichtbar:
 1. `rag-3a-ingest.py` erzeugt den semantisch gechunkten Chroma-Index.
 2. `rag-4a-graph.py` verbindet aufeinanderfolgende Chunks derselben Quelle und
    erkannte Gesetzesverweise wie `Art. 25`.
-3. `rag-4b-chat.py` sucht zunächst Vektor-Seeds und ergänzt anschließend
-   relevante Nachbar- und Referenz-Chunks aus dem Graph.
+3. `rag-4b-chat.py` sucht semantische Vektor-Seeds.
+4. Ein kleiner BM25-ähnlicher Index sucht parallel in den normalisierten
+   Artikel-Chunks. Erlassnamen und Abkürzungen wie `ZGB`, `StGB` oder `MWSTG`
+   verstärken nur Artikel, die zugleich einen inhaltlichen Texttreffer haben.
+5. Beide Rankings werden mit klassischer Reciprocal Rank Fusion dedupliziert
+   zusammengeführt und anschließend um relevante Nachbar- und
+   Referenz-Chunks aus dem Graph ergänzt.
 
 ```bash
 poetry run python rag-3a-ingest.py
@@ -131,7 +137,11 @@ Teil der Vector-RAG-vs.-GraphRAG-Evaluation.
 
 Der Graph wird lokal unter `.chroma/rag_semantic_graph.json` gespeichert und
 nicht versioniert. Mit `GRAPH_SEED_K` und `GRAPH_CONTEXT_K` lässt sich steuern,
-wie viele Vektor-Treffer und Graph-Chunks in den Kontext gelangen.
+wie viele Vektor-Treffer und Chunks insgesamt in den Kontext gelangen.
+`GRAPH_ARTICLE_K` steuert die Zahl lexikalischer Artikelkandidaten
+(Standard: 2). In der Evaluation entspricht dies `--article-k`.
+Nach Änderungen an der Artikelerkennung muss `rag-4a-graph.py` erneut
+ausgeführt werden; Chat und Evaluation lehnen veraltete Graphformate ab.
 
 ## Evaluation: Vector-RAG vs. GraphRAG
 
@@ -140,10 +150,13 @@ Artikeln, Referenzantworten und atomaren Pflichtfakten. `evaluate.py` lässt
 beide Retrieval-Varianten mit demselben Chat-Modell antworten und vergleicht:
 
 - Quellen-Recall, Article Hit@K, Article Recall@K und Article MRR,
-- Faktenabdeckung der generierten Antwort,
-- Korrektheit und Vollständigkeit der Quellen-/Artikelangaben,
+- Faktenabdeckung der generierten Antwort; zusammengesetzte Fakten können
+  mehrere gleichzeitig erforderliche `all_of`-Bedingungen enthalten,
+- Präzision erwarteter Quellen-/Artikelbezeichner, Grounding gegen die
+  tatsächlich abgerufenen Artikel und Vollständigkeit der Zitate,
 - Abdeckung erwarteter Begriffe als reine Retrieval-Diagnose,
-- geschätzten Kontext-Tokens,
+- geschätzten Tokens des reinen Dokumentkontexts und des vollständigen
+  Prompt-Kontexts inklusive Quellen- und Chunkbezeichnern,
 - geschätzten Antwort-Tokens,
 - Tokenersparnis gegenüber dem vollständigen Korpus.
 
@@ -159,9 +172,17 @@ und eine für GraphRAG. Die Bewertung selbst ist deterministisch und verwendet
 keinen zusätzlichen LLM-Judge. `Term Coverage` wird ausdrücklich nicht als
 Antwortqualität interpretiert.
 
+`Expected-citation precision` prüft, ob die genannten Quellen-/Artikelpaare
+zur Referenzfrage gehören. `Citation grounding` prüft zusätzlich, ob diese
+Artikel tatsächlich im abgerufenen Kontext vorhanden waren. Beide Metriken
+prüfen bewusst keine freie semantische Schlussfolgerung zwischen Aussage und
+Gesetzestext.
+Zusätze wie `Abs. 1`, `lit. a`, `Ziff. 2` oder Fussnoten dürfen im Zitat stehen;
+für die Metriken wird der jeweilige Basisartikel ausgewertet.
+
 Die strategische Perspektive ist Teil des Reports: RAG spart Tokens gegenüber
 dem vollständigen Kontext. Vector-RAG und GraphRAG verwenden standardmässig
-dasselbe Budget von vier Chunks (`--context-k`), damit der Vergleich fair
+dasselbe Budget von sechs Chunks (`--context-k`), damit der Vergleich fair
 bleibt. `--graph-seed-k` bestimmt, wie viele davon zunächst über die
 Vektorsuche gewählt werden.
 

@@ -11,11 +11,11 @@
     "required_facts": [
       {
         "description": "Die ordentliche Probezeit beträgt einen Monat.",
-        "alternatives": ["erster monat", "erste monat", "ersten monat", "einen monat", "ein monat"]
+        "all_of": [["erster monat", "erste monat", "ersten monat", "einen monat", "ein monat"]]
       },
       {
         "description": "Die Probezeit darf höchstens drei Monate dauern.",
-        "alternatives": ["höchstens drei monate", "höchstens auf drei monate", "maximal drei monate"]
+        "all_of": [["höchstens drei monate", "höchstens auf drei monate", "maximal drei monate"]]
       }
     ]
   },
@@ -31,15 +31,22 @@
     "required_facts": [
       {
         "description": "Die Überstunden müssen notwendig, möglich und zumutbar sein.",
-        "alternatives": ["notwendig", "zumutbar", "treu und glauben"]
+        "all_of": [
+          ["notwendig"],
+          ["leisten kann", "leisten vermag"],
+          ["zumutbar", "zugemutet", "treu und glauben"]
+        ]
       },
       {
         "description": "Freizeitausgleich setzt Einverständnis voraus und dauert mindestens gleich lang.",
-        "alternatives": ["einverständnis", "gleicher dauer", "gleiche dauer"]
+        "all_of": [
+          ["einverständnis"],
+          ["gleicher dauer", "gleiche dauer"]
+        ]
       },
       {
         "description": "Ohne Freizeitausgleich gilt grundsätzlich ein Lohnzuschlag von mindestens 25 Prozent.",
-        "alternatives": ["mindestens einem viertel", "mindestens 25 prozent", "25-prozent"]
+        "all_of": [["mindestens einem viertel", "mindestens 25 prozent", "25-prozent"]]
       }
     ]
   },
@@ -55,11 +62,11 @@
     "required_facts": [
       {
         "description": "Jede Person kann diese Auskunft verlangen.",
-        "alternatives": ["jede person", "eine person kann"]
+        "all_of": [["jede person", "eine person kann"]]
       },
       {
         "description": "Die Auskunft betrifft die Bearbeitung eigener Personendaten.",
-        "alternatives": ["ob personendaten über sie bearbeitet", "bearbeitung ihrer personendaten"]
+        "all_of": [["ob personendaten über sie bearbeitet", "bearbeitung ihrer personendaten"]]
       }
     ]
   },
@@ -75,11 +82,11 @@
     "required_facts": [
       {
         "description": "Volljährigkeit ist erforderlich.",
-        "alternatives": ["volljährig", "volljährigkeit"]
+        "all_of": [["volljährig", "volljährigkeit"]]
       },
       {
         "description": "Urteilsfähigkeit ist erforderlich.",
-        "alternatives": ["urteilsfähig", "urteilsfähigkeit"]
+        "all_of": [["urteilsfähig", "urteilsfähigkeit"]]
       }
     ]
   },
@@ -95,11 +102,11 @@
     "required_facts": [
       {
         "description": "Es braucht einen rechtswidrigen Angriff oder eine unmittelbare Bedrohung.",
-        "alternatives": ["ohne recht angegriffen", "unmittelbar mit einem angriff bedroht", "rechtswidrigen angriff"]
+        "all_of": [["ohne recht angegriffen", "unmittelbar mit einem angriff bedroht", "rechtswidrigen angriff"]]
       },
       {
         "description": "Die Abwehr muss den Umständen angemessen sein.",
-        "alternatives": ["angemessenen weise", "angemessen sein", "verhältnismässig"]
+        "all_of": [["angemessenen weise", "angemessen sein", "verhältnismässig"]]
       }
     ]
   },
@@ -115,11 +122,14 @@
     "required_facts": [
       {
         "description": "Die Unschuldsvermutung gilt bis zur rechtskräftigen Verurteilung.",
-        "alternatives": ["bis zu ihrer rechtskräftigen verurteilung", "bis zur rechtskräftigen verurteilung"]
+        "all_of": [["bis zu ihrer rechtskräftigen verurteilung", "bis zur rechtskräftigen verurteilung"]]
       },
       {
         "description": "Unüberwindliche Zweifel führen zur günstigeren Sachlage.",
-        "alternatives": ["günstigeren sachlage", "zugunsten der beschuldigten person"]
+        "all_of": [
+          ["unüberwindliche zweifel", "unüberwindlichen zweifeln"],
+          ["günstigeren sachlage", "günstigere sachlage", "zugunsten der beschuldigten person"]
+        ]
       }
     ]
   },
@@ -135,11 +145,11 @@
     "required_facts": [
       {
         "description": "Der Normalsatz beträgt 8,1 Prozent.",
-        "alternatives": ["8,1 prozent", "8.1 prozent", "8,1 %"]
+        "all_of": [["8,1 prozent", "8.1 prozent", "8,1 %"]]
       },
       {
         "description": "Der reduzierte Satz beträgt 2,6 Prozent.",
-        "alternatives": ["2,6 prozent", "2.6 prozent", "2,6 %"]
+        "all_of": [["2,6 prozent", "2.6 prozent", "2,6 %"]]
       }
     ]
   },
@@ -156,11 +166,14 @@
     "required_facts": [
       {
         "description": "BV und StPO schützen die Unschuldsvermutung bis zur rechtskräftigen Verurteilung.",
-        "alternatives": ["bis zur rechtskräftigen verurteilung", "bis zu ihrer rechtskräftigen verurteilung"]
+        "all_of": [["bis zur rechtskräftigen verurteilung", "bis zu ihrer rechtskräftigen verurteilung"]]
       },
       {
         "description": "Die StPO regelt zusätzlich die günstigere Sachlage bei unüberwindlichen Zweifeln.",
-        "alternatives": ["unüberwindlichen zweifeln", "günstigeren sachlage"]
+        "all_of": [
+          ["unüberwindliche zweifel", "unüberwindlichen zweifeln"],
+          ["günstigeren sachlage", "günstigere sachlage", "zugunsten der beschuldigten person"]
+        ]
       }
     ]
   }
