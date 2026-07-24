@@ -5,6 +5,7 @@
 #   pip install -r requirements.txt
 chromadb>=0.5
 openai>=1.40
+pypdf>=5.0
 python-dotenv>=1.0
 
 # Optional — only for notebooks/01_rag-zu-fuss.ipynb:

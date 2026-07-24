@@ -1,0 +1,180 @@
+[
+  {
+    "id": "or-probezeit",
+    "question": "Wie lange dauert die Probezeit bei einem neuen Arbeitsverhältnis und wie lange kann sie maximal verlängert werden?",
+    "expected_sources": ["SR_220_OR_de.md"],
+    "expected_articles": [
+      {"source": "SR_220_OR_de.md", "article": "335b"}
+    ],
+    "expected_terms": ["probezeit", "erster monat", "drei monate"],
+    "reference_answer": "Die Probezeit beträgt grundsätzlich den ersten Monat des Arbeitsverhältnisses und darf höchstens auf drei Monate verlängert werden.",
+    "required_facts": [
+      {
+        "description": "Die ordentliche Probezeit beträgt einen Monat.",
+        "all_of": [["erster monat", "erste monat", "ersten monat", "einen monat", "ein monat"]]
+      },
+      {
+        "description": "Die Probezeit darf höchstens drei Monate dauern.",
+        "all_of": [["höchstens drei monate", "höchstens auf drei monate", "maximal drei monate"]]
+      }
+    ]
+  },
+  {
+    "id": "or-ueberstunden",
+    "question": "Unter welchen Voraussetzungen muss ein Arbeitnehmer Überstunden leisten und wie können sie kompensiert werden?",
+    "expected_sources": ["SR_220_OR_de.md"],
+    "expected_articles": [
+      {"source": "SR_220_OR_de.md", "article": "321c"}
+    ],
+    "expected_terms": ["überstundenarbeit", "zugemutet", "freizeit"],
+    "reference_answer": "Notwendige Überstunden sind zu leisten, soweit die arbeitnehmende Person sie leisten kann und sie nach Treu und Glauben zumutbar sind. Mit ihrem Einverständnis ist ein Ausgleich durch Freizeit mindestens gleicher Dauer möglich; andernfalls ist grundsätzlich der Normallohn mit mindestens 25 Prozent Zuschlag geschuldet.",
+    "required_facts": [
+      {
+        "description": "Die Überstunden müssen notwendig, möglich und zumutbar sein.",
+        "all_of": [
+          ["notwendig"],
+          ["leisten kann", "leisten vermag"],
+          ["zumutbar", "zugemutet", "treu und glauben"]
+        ]
+      },
+      {
+        "description": "Freizeitausgleich setzt Einverständnis voraus und dauert mindestens gleich lang.",
+        "all_of": [
+          ["einverständnis"],
+          ["gleicher dauer", "gleiche dauer"]
+        ]
+      },
+      {
+        "description": "Ohne Freizeitausgleich gilt grundsätzlich ein Lohnzuschlag von mindestens 25 Prozent.",
+        "all_of": [["mindestens einem viertel", "mindestens 25 prozent", "25-prozent"]]
+      }
+    ]
+  },
+  {
+    "id": "dsg-auskunft",
+    "question": "Kann eine Person verlangen zu erfahren, ob Personendaten über sie bearbeitet werden?",
+    "expected_sources": ["SR_235.1_DSG_de.md"],
+    "expected_articles": [
+      {"source": "SR_235.1_DSG_de.md", "article": "25"}
+    ],
+    "expected_terms": ["auskunftsrecht", "personendaten", "bearbeitet"],
+    "reference_answer": "Ja. Jede Person kann vom Verantwortlichen Auskunft darüber verlangen, ob Personendaten über sie bearbeitet werden.",
+    "required_facts": [
+      {
+        "description": "Jede Person kann diese Auskunft verlangen.",
+        "all_of": [["jede person", "eine person kann"]]
+      },
+      {
+        "description": "Die Auskunft betrifft die Bearbeitung eigener Personendaten.",
+        "all_of": [["ob personendaten über sie bearbeitet", "bearbeitung ihrer personendaten"]]
+      }
+    ]
+  },
+  {
+    "id": "zgb-handlungsfaehigkeit",
+    "question": "Welche Voraussetzungen gelten nach dem ZGB für die Handlungsfähigkeit?",
+    "expected_sources": ["SR_210_ZGB_de.md"],
+    "expected_articles": [
+      {"source": "SR_210_ZGB_de.md", "article": "13"}
+    ],
+    "expected_terms": ["handlungsfähig", "volljährig", "urteilsfähig"],
+    "reference_answer": "Handlungsfähig ist, wer volljährig und urteilsfähig ist.",
+    "required_facts": [
+      {
+        "description": "Volljährigkeit ist erforderlich.",
+        "all_of": [["volljährig", "volljährigkeit"]]
+      },
+      {
+        "description": "Urteilsfähigkeit ist erforderlich.",
+        "all_of": [["urteilsfähig", "urteilsfähigkeit"]]
+      }
+    ]
+  },
+  {
+    "id": "stgb-notwehr",
+    "question": "Unter welchen Voraussetzungen darf ein unmittelbar drohender Angriff als Notwehr abgewehrt werden?",
+    "expected_sources": ["SR_311.0_StGB_de.md"],
+    "expected_articles": [
+      {"source": "SR_311.0_StGB_de.md", "article": "15"}
+    ],
+    "expected_terms": ["notwehr", "angriff", "angemessenen"],
+    "reference_answer": "Wer ohne Recht angegriffen oder unmittelbar mit einem Angriff bedroht wird, darf den Angriff in einer den Umständen angemessenen Weise abwehren.",
+    "required_facts": [
+      {
+        "description": "Es braucht einen rechtswidrigen Angriff oder eine unmittelbare Bedrohung.",
+        "all_of": [["ohne recht angegriffen", "unmittelbar mit einem angriff bedroht", "rechtswidrigen angriff"]]
+      },
+      {
+        "description": "Die Abwehr muss den Umständen angemessen sein.",
+        "all_of": [["angemessenen weise", "angemessen sein", "verhältnismässig"]]
+      }
+    ]
+  },
+  {
+    "id": "stpo-unschuldsvermutung",
+    "question": "Was bedeutet die Unschuldsvermutung und wie ist bei unüberwindlichen Zweifeln zu entscheiden?",
+    "expected_sources": ["SR_312.0_StPO_de.md"],
+    "expected_articles": [
+      {"source": "SR_312.0_StPO_de.md", "article": "10"}
+    ],
+    "expected_terms": ["unschuldig", "unüberwindliche zweifel", "günstigeren sachlage"],
+    "reference_answer": "Jede Person gilt bis zu ihrer rechtskräftigen Verurteilung als unschuldig. Bei unüberwindlichen Zweifeln ist von der für die beschuldigte Person günstigeren Sachlage auszugehen.",
+    "required_facts": [
+      {
+        "description": "Die Unschuldsvermutung gilt bis zur rechtskräftigen Verurteilung.",
+        "all_of": [["bis zu ihrer rechtskräftigen verurteilung", "bis zur rechtskräftigen verurteilung"]]
+      },
+      {
+        "description": "Unüberwindliche Zweifel führen zur günstigeren Sachlage.",
+        "all_of": [
+          ["unüberwindliche zweifel", "unüberwindlichen zweifeln"],
+          ["günstigeren sachlage", "günstigere sachlage", "zugunsten der beschuldigten person"]
+        ]
+      }
+    ]
+  },
+  {
+    "id": "mwst-steuersaetze",
+    "question": "Wie hoch sind der Normalsatz und der reduzierte Mehrwertsteuersatz?",
+    "expected_sources": ["SR_641.20_MWSTG_de.md"],
+    "expected_articles": [
+      {"source": "SR_641.20_MWSTG_de.md", "article": "25"}
+    ],
+    "expected_terms": ["8,1 prozent", "2,6 prozent", "steuersatz"],
+    "reference_answer": "Der Normalsatz beträgt 8,1 Prozent, der reduzierte Steuersatz 2,6 Prozent.",
+    "required_facts": [
+      {
+        "description": "Der Normalsatz beträgt 8,1 Prozent.",
+        "all_of": [["8,1 prozent", "8.1 prozent", "8,1 %"]]
+      },
+      {
+        "description": "Der reduzierte Satz beträgt 2,6 Prozent.",
+        "all_of": [["2,6 prozent", "2.6 prozent", "2,6 %"]]
+      }
+    ]
+  },
+  {
+    "id": "bv-stpo-vergleich",
+    "question": "Wie wird die Unschuldsvermutung in der Bundesverfassung und in der Strafprozessordnung geregelt?",
+    "expected_sources": ["SR_101_BV_de.md", "SR_312.0_StPO_de.md"],
+    "expected_articles": [
+      {"source": "SR_101_BV_de.md", "article": "32"},
+      {"source": "SR_312.0_StPO_de.md", "article": "10"}
+    ],
+    "expected_terms": ["unschuldsvermutung", "rechtskräftigen verurteilung"],
+    "reference_answer": "BV Artikel 32 und StPO Artikel 10 erklären jede Person bis zur rechtskräftigen Verurteilung für unschuldig. Die StPO ergänzt die freie Beweiswürdigung und verlangt bei unüberwindlichen Zweifeln die für die beschuldigte Person günstigere Sachlage.",
+    "required_facts": [
+      {
+        "description": "BV und StPO schützen die Unschuldsvermutung bis zur rechtskräftigen Verurteilung.",
+        "all_of": [["bis zur rechtskräftigen verurteilung", "bis zu ihrer rechtskräftigen verurteilung"]]
+      },
+      {
+        "description": "Die StPO regelt zusätzlich die günstigere Sachlage bei unüberwindlichen Zweifeln.",
+        "all_of": [
+          ["unüberwindliche zweifel", "unüberwindlichen zweifeln"],
+          ["günstigeren sachlage", "günstigere sachlage", "zugunsten der beschuldigten person"]
+        ]
+      }
+    ]
+  }
+]
