@@ -18,3 +18,6 @@ uv.lock
 
 # Downloaded corpus (reproducible via scripts/fedlex_download.py)
 scripts/fedlex_pdfs/
+
+data/SR_*.md
+evaluation/report.md
