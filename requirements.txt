@@ -1,4 +1,4 @@
-# Core dependencies for all five stages (rag-1 ... rag-3b).
+# Core dependencies for all workshop stages.
 # Usage with a plain venv:
 #   python -m venv .venv
 #   .venv\Scripts\activate        (Windows)  |  source .venv/bin/activate  (Linux/macOS)
@@ -7,6 +7,7 @@ chromadb>=0.5
 openai>=1.40
 pypdf>=5.0
 python-dotenv>=1.0
+sentence-transformers>=5.0
 
 # Optional — only for notebooks/01_rag-zu-fuss.ipynb:
 # jupyterlab>=4.0

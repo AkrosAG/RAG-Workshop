@@ -1,12 +1,13 @@
-"""Stage 2b — RAG chat: augment the prompt with retrieved chunks.
+"""Stage 3b — Classical vector retrieval over the semantic chunks from 3a.
 
-Builds on rag-1-chat.py (same chat backbone) and uses the vector store filled
-by rag-2a-ingest.py. New is the retrieval step: embed the question, fetch the
-most similar chunks from Chroma, and put them into the prompt as context.
+Builds on rag-2b-chat.py. The retrieval algorithm deliberately stays the same:
+embed the question, retrieve the TOP_K nearest chunks from Chroma, and use them
+as context. The only difference from 2b is the default collection:
+'rag_semantic', created by rag-3a-ingest.py.
 
-Set RAG_COLLECTION=rag_semantic to chat over the store built by rag-3a-ingest.py.
+This isolates the effect of improved chunking before stage 3c adds re-ranking.
 
-Run:  poetry run python rag-2b-chat.py "What is a vector database?"
+Run:  poetry run python rag-3b-chat-classical.py "What is a vector database?"
 """
 
 import os
@@ -22,7 +23,7 @@ load_dotenv()
 # Minimal error handling: print one line instead of a stack trace.
 sys.excepthook = lambda exc_type, exc, _: sys.exit(f"{exc_type.__name__}: {exc}")
 
-# --- Configuration (as in rag-1/2a) ---
+# --- Configuration (as in rag-2b, but using the semantic collection) ---
 CHAT_MODEL = os.getenv("LLM_MODEL", "llama3.2")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
 client = OpenAI(
@@ -31,30 +32,36 @@ client = OpenAI(
 )
 
 ROOT = Path(__file__).resolve().parent
-COLLECTION = os.getenv("RAG_COLLECTION", "rag_fixed")
+COLLECTION = os.getenv("RAG_COLLECTION", "rag_semantic")
 TOP_K = 4
 
 question = " ".join(sys.argv[1:]) or "What is a vector database?"
 
 
 def embed(texts: list[str]) -> list[list[float]]:
-    """As in rag-2a-ingest.py — the question must use the same model as the chunks."""
+    """Embed the question with the same model used for the stored chunks."""
     resp = client.embeddings.create(model=EMBED_MODEL, input=texts)
     return [d.embedding for d in resp.data]
 
 
-# --- NEW in 2b: retrieve context for the question ---
-collection = chromadb.PersistentClient(path=str(ROOT / ".chroma-2")).get_collection(
+# --- Retrieve: unchanged classical vector Top-K from rag-2b ---
+collection = chromadb.PersistentClient(path=str(ROOT / ".chroma-3")).get_collection(
     COLLECTION, embedding_function=None
 )
 hits = collection.query(query_embeddings=embed([question]), n_results=TOP_K)
 context = "\n\n".join(hits["documents"][0])
 
-# --- Ask (as in rag-1, but with the retrieved context in the prompt) ---
+# --- Ask: answer only from the retrieved context ---
 answer = client.chat.completions.create(
     model=CHAT_MODEL,
     messages=[
-        {"role": "system", "content": "Answer the question using ONLY the context. If it is not in the context, say so."},
+        {
+            "role": "system",
+            "content": (
+                "Answer the question using ONLY the context. "
+                "If it is not in the context, say so."
+            ),
+        },
         {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"},
     ],
 )

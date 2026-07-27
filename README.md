@@ -1,6 +1,6 @@
 # RAG-Workshop — vom Chat-Backbone zum verfeinerten RAG
 
-Didaktische Progression in sieben kleinen Skripten: Jedes baut sichtbar auf dem
+Didaktische Progression in acht kleinen Skripten: Jedes baut sichtbar auf dem
 vorigen auf — gleiche Konfiguration, gleiche Struktur, pro Stufe kommt genau
 ein Konzept dazu. Kein Framework, keine Blackbox.
 
@@ -11,7 +11,9 @@ rag-2a-ingest.py       + Ingest: Fixed-Size-Chunking → Embedding-DB (Chroma, f
 rag-2b-chat.py         + Retrieval: Abfrage mit passenden Chunks anreichern (= RAG)
    │
 rag-3a-ingest.py       Verfeinerung Ingest: semantisches Chunking (Absätze/Überschriften)
-rag-3b-chat.py         Verfeinerung Retrieval: Over-Fetch + LLM-Re-Ranking
+rag-3b-chat-classical.py
+                       Klassische Vector-Top-K-Abfrage auf den semantischen Chunks
+rag-3c-chat-rerank.py  Over-Fetch + Re-Ranking mit einem BGE-Cross-Encoder
    │
 rag-4a-graph.py        Graph: Nachbar-Chunks + explizite Gesetzesverweise
 rag-4b-chat.py         Hybrid GraphRAG: Vektor + Artikelsuche → Graph → Antwort
@@ -25,7 +27,8 @@ rag-4b-chat.py         Hybrid GraphRAG: Vektor + Artikelsuche → Graph → Antw
 | `rag-2a-ingest.py` | rag-1 | `chunk()` (fix), `embed()`, idempotentes Befüllen von Chroma (`rag_fixed`) |
 | `rag-2b-chat.py` | rag-1 + 2a | Frage embedden → Top-K-Chunks holen → als Kontext in den Prompt |
 | `rag-3a-ingest.py` | rag-2a | nur `chunk()` geändert: struktur-/absatzbewusst (Collection `rag_semantic`) |
-| `rag-3b-chat.py` | rag-2b | Over-Fetch (Top-10) + Re-Ranking durch das Chat-Modell → beste 4 |
+| `rag-3b-chat-classical.py` | rag-2b + 3a | unveränderte Vector-Top-K-Abfrage auf den semantischen Chunks |
+| `rag-3c-chat-rerank.py` | rag-3b | Over-Fetch (Top-10) + dynamisches BGE-Re-Ranking von Frage und Chunk → beste 4 |
 | `rag-4a-graph.py` | rag-3a | baut einen transparenten Retrieval-Graph aus Nachbarschaft und `Art.`-Verweisen |
 | `rag-4b-chat.py` | rag-4a | kombiniert Vektor- und lexikalische Artikeltreffer und erweitert sie über Graph-Kanten |
 
@@ -63,7 +66,8 @@ poetry run python rag-1-chat.py "Why is the sky blue?"      # 1: Backbone
 poetry run python rag-2a-ingest.py                            # 2a: Index bauen
 poetry run python rag-2b-chat.py "What is a vector database?" # 2b: RAG
 poetry run python rag-3a-ingest.py                            # 3a: semantischer Index
-poetry run python rag-3b-chat.py "What is a vector database?" # 3b: mit Re-Ranking
+poetry run python rag-3b-chat-classical.py "What is a vector database?" # 3b: Vector Top-K
+poetry run python rag-3c-chat-rerank.py "What is a vector database?" # 3c: BGE-Re-Ranking
 poetry run python rag-4a-graph.py                              # 4a: Graph bauen
 poetry run python rag-4b-chat.py "Wie lange dauert die Probezeit?" # 4b: GraphRAG
 ```
@@ -107,6 +111,35 @@ und `rag-3a-ingest.py` die erzeugten `data/SR_*.md` automatisch.
 
 Die Ingestion verarbeitet den großen Rechtskorpus in Batches von 64 Chunks.
 Bei Bedarf lässt sich die Größe über `EMBED_BATCH_SIZE` reduzieren.
+
+## Klassisches Retrieval und Re-Ranking
+
+Stufe 3 trennt zwei Verbesserungen bewusst voneinander. `rag-3a-ingest.py`
+verbessert ausschliesslich das Chunking. `rag-3b-chat-classical.py` fragt
+diesen semantischen Index weiterhin mit der klassischen Vektorsuche ab und
+verwendet die vier ähnlichsten Chunks direkt als Kontext. Alle drei Skripte
+der Stufe 3 verwenden dafür den getrennten Chroma-Speicher `.chroma-3`.
+
+`rag-3c-chat-rerank.py` holt zunächst zehn Vektorkandidaten. Anschliessend
+bewertet `BAAI/bge-reranker-v2-m3` jedes Paar aus Frage und Chunk gemeinsam und
+sortiert die Kandidaten nach diesem Relevanzscore neu. Nur die besten vier
+Chunks gelangen in den Antwort-Prompt:
+
+```text
+2b: Fixed-Size-Chunks → Vector Top-4
+3b: Semantic Chunks   → Vector Top-4
+3c: Semantic Chunks   → Vector Top-10 → BGE-Re-Ranking → Top-4
+```
+
+Der Cross-Encoder wird beim ersten Start heruntergeladen und danach im lokalen
+Hugging-Face-Cache wiederverwendet. Der Download ist deutlich grösser als die
+Workshop-Skripte selbst; CPU-Inferenz funktioniert, eine unterstützte GPU
+beschleunigt das Re-Ranking. Über `RERANK_MODEL` kann ein anderes kompatibles
+Cross-Encoder-Modell gewählt werden.
+
+Ein Re-Rank-Score kann nicht beim Ingest vorberechnet werden: Anders als ein
+Embedding verarbeitet der Cross-Encoder Frage und Chunk gemeinsam. Das
+Re-Ranking findet deshalb bei jeder Abfrage statt.
 
 ## GraphRAG
 
@@ -186,19 +219,21 @@ dasselbe Budget von sechs Chunks (`--context-k`), damit der Vergleich fair
 bleibt. `--graph-seed-k` bestimmt, wie viele davon zunächst über die
 Vektorsuche gewählt werden.
 
-Beide Chat-Skripte können auf beide Indizes zeigen — so lassen sich die
+Die Chat-Skripte können auf beide Indizes zeigen — so lassen sich die
 Chunking-Strategien direkt vergleichen:
 
 ```bash
 RAG_COLLECTION=rag_semantic poetry run python rag-2b-chat.py "..."
-RAG_COLLECTION=rag_semantic poetry run python rag-3b-chat.py "..."
+RAG_COLLECTION=rag_semantic poetry run python rag-3b-chat-classical.py "..."
+RAG_COLLECTION=rag_semantic poetry run python rag-3c-chat-rerank.py "..."
 ```
 
 ## Endpoint wählen (`.env`) — Key bleibt ausserhalb
 
-`.env` enthält nur **Nicht-Geheimes**: `LLM_BASE_URL`, `LLM_MODEL`, `EMBED_MODEL`
-(siehe `.env.example`). Konfiguriert ist Marvin; der Endpoint ist nur über das
-AKROS-VPN erreichbar und benötigt einen passenden API-Key.
+`.env` enthält nur **Nicht-Geheimes**: `LLM_BASE_URL`, `LLM_MODEL`,
+`EMBED_MODEL` und `RERANK_MODEL` (siehe `.env.example`). Konfiguriert ist
+Marvin; der Endpoint ist nur über das AKROS-VPN erreichbar und benötigt einen
+passenden API-Key. Der Re-Ranker läuft lokal.
 
 Der **API-Key wird nie in eine Datei geschrieben**. Für einen Endpoint mit Key
 (z. B. einen internen LiteLLM-Proxy) setzt du ihn einmal pro Shell-Session:
@@ -222,8 +257,8 @@ rag-demo/
 ├── data/                     # neutraler Beispiel-Datensatz (3 Markdown-Dokumente)
 ├── notebooks/
 │   └── 01_rag-zu-fuss.ipynb  # die Stufen 1–2b als Schritt-für-Schritt-Notebook (mit Lücke)
-├── rag-1-chat.py … rag-3b-chat.py
-├── pyproject.toml            # Abhängigkeiten (Poetry): chromadb, openai, python-dotenv
+├── rag-1-chat.py … rag-3c-chat-rerank.py
+├── pyproject.toml            # Laufzeit- und optionale Notebook-Abhängigkeiten
 └── poetry.lock
 ```
 
@@ -240,6 +275,6 @@ poetry run jupyter lab
 ## Weiterführende Ideen (Workshop Block 2)
 
 - **Chunking:** Overlap in `rag-2a`, andere Budgets, AST-basiert für Quellcode.
-- **Re-Ranking:** dedizierter Cross-Encoder statt LLM-Judge.
+- **Re-Ranking:** Kandidatenzahl, Modell und Laufzeit vergleichen.
 - **Query Rewriting:** die Frage vor dem Embedden umformulieren/erweitern.
 - **Evaluation:** beide Indizes und beide Retrieval-Varianten gegen Referenzfragen messen.

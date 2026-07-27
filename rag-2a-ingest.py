@@ -55,7 +55,7 @@ def embed(texts: list[str]) -> list[list[float]]:
     return embeddings
 
 
-collection = chromadb.PersistentClient(path=str(ROOT / ".chroma")).get_or_create_collection(
+collection = chromadb.PersistentClient(path=str(ROOT / ".chroma-2")).get_or_create_collection(
     COLLECTION, embedding_function=None, metadata={"hnsw:space": "cosine"}
 )
 
