@@ -37,7 +37,7 @@ client = OpenAI(
 )
 
 ROOT = Path(__file__).resolve().parent
-COLLECTION = os.getenv("RAG_COLLECTION", "rag_fixed")
+COLLECTION = os.getenv("RAG_COLLECTION", "rag_semantic")  # default to the semantic store from rag-3a
 TOP_N = 10  # NEW: candidates fetched from the store (over-fetch)
 TOP_K = 4   # candidates that survive the re-ranking
 
