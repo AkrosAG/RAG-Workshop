@@ -137,6 +137,17 @@ Workshop-Skripte selbst; CPU-Inferenz funktioniert, eine unterstützte GPU
 beschleunigt das Re-Ranking. Über `RERANK_MODEL` kann ein anderes kompatibles
 Cross-Encoder-Modell gewählt werden.
 
+Für eine Workshopumgebung ohne verlässlichen Internetzugang sollte der
+Modell-Cache vorab gefüllt werden. Auf jedem Workshop-Rechner einmal ausführen:
+
+```bash
+poetry run python -c "from sentence_transformers import CrossEncoder; CrossEncoder('BAAI/bge-reranker-v2-m3')"
+```
+
+Anschliessend lässt sich der Re-Ranker aus dem lokalen Hugging-Face-Cache
+starten. Ohne vorab gefüllten Cache benötigt der erste Lauf Internetzugang und
+kann wegen des Modelldownloads deutlich länger dauern.
+
 Ein Re-Rank-Score kann nicht beim Ingest vorberechnet werden: Anders als ein
 Embedding verarbeitet der Cross-Encoder Frage und Chunk gemeinsam. Das
 Re-Ranking findet deshalb bei jeder Abfrage statt.

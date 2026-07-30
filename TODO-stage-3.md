@@ -55,8 +55,9 @@
 - [X] Lockdatei aktualisieren.
 - [X] Downloadgrösse, erstmalige Modellinitialisierung und CPU-/GPU-Verhalten
   im README erwähnen.
-- [ ] Prüfen, ob für die Workshopumgebung ein vorab gefüllter Modell-Cache
-  benötigt wird.
+- [X] Prüfen, ob für die Workshopumgebung ein vorab gefüllter Modell-Cache
+  benötigt wird. Ergebnis: für einen zuverlässigen Workshop ohne garantierten
+  Internetzugang vorab füllen; Befehl im README dokumentiert.
 
 ## Dokumentation
 
@@ -77,11 +78,11 @@
 ## Tests und Validierung
 
 - [X] Syntaxprüfung für alle Skripte ausführen.
-- [ ] Testen, dass 3b ohne Re-Ranker exakt `TOP_K` Chunks verwendet.
-- [ ] Testen, dass 3c höchstens `TOP_N` Kandidaten bewertet und genau `TOP_K`
+- [X] Testen, dass 3b ohne Re-Ranker exakt `TOP_K` Chunks verwendet.
+- [X] Testen, dass 3c höchstens `TOP_N` Kandidaten bewertet und genau `TOP_K`
   übernimmt.
-- [ ] Testen, dass Kandidaten anhand der BGE-Scores absteigend sortiert werden.
-- [ ] Prüfen, dass Dokumente und Quellen nach dem Sortieren zusammenbleiben.
-- [ ] Mindestens eine deutsche beziehungsweise schweizerrechtliche Testfrage
+- [X] Testen, dass Kandidaten anhand der BGE-Scores absteigend sortiert werden.
+- [X] Prüfen, dass Dokumente und Quellen nach dem Sortieren zusammenbleiben.
+- [X] Mindestens eine deutsche beziehungsweise schweizerrechtliche Testfrage
   zwischen 3b und 3c vergleichen.
 - [X] Vorhandene Unit-Tests und Git-Whitespace-Prüfung ausführen.
