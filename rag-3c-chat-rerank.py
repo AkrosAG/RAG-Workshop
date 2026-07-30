@@ -17,11 +17,11 @@ Run:  poetry run python rag-3c-chat-rerank.py "What is a vector database?"
 import os
 import sys
 from pathlib import Path
+from typing import Callable
 
 import chromadb
 from dotenv import load_dotenv
 from openai import OpenAI
-from sentence_transformers import CrossEncoder
 
 load_dotenv()
 
@@ -42,23 +42,57 @@ COLLECTION = os.getenv("RAG_COLLECTION", "rag_semantic")
 TOP_N = 10
 TOP_K = 4
 
-question = " ".join(sys.argv[1:]) or "What is a vector database?"
-
-
 def embed(texts: list[str]) -> list[list[float]]:
     """Embed the question with the same model used for the stored chunks."""
     resp = client.embeddings.create(model=EMBED_MODEL, input=texts)
     return [d.embedding for d in resp.data]
 
 
-def rerank(question: str, candidates: list[str], keep: int) -> list[tuple[int, float]]:
+def retrieve_candidates(
+    collection: object, query_embedding: list[float], top_n: int = TOP_N
+) -> list[dict[str, object]]:
+    """Return at most top-n vector candidates in their original rank order."""
+    hits = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=top_n,
+        include=["documents", "metadatas"],
+    )
+    return [
+        {
+            "document": document,
+            "metadata": metadata,
+            "vector_rank": rank,
+        }
+        for rank, (document, metadata) in enumerate(
+            zip(
+                hits["documents"][0][:top_n],
+                hits["metadatas"][0][:top_n],
+            ),
+            start=1,
+        )
+    ]
+
+
+def rerank(
+    question: str,
+    candidates: list[str],
+    keep: int,
+    model_factory: Callable[[str], object] | None = None,
+) -> list[tuple[int, float]]:
     """Return (candidate index, score), ordered by cross-encoder relevance."""
+    if model_factory is None:
+        def model_factory(model_name: str) -> object:
+            from sentence_transformers import CrossEncoder
+
+            return CrossEncoder(model_name)
+
     try:
-        model = CrossEncoder(RERANK_MODEL)
-    except (OSError, ValueError) as exc:
+        model = model_factory(RERANK_MODEL)
+    except (ImportError, OSError, ValueError) as exc:
         raise RuntimeError(
             f"Could not load re-ranker '{RERANK_MODEL}'. "
-            "The first run needs internet access to download the model."
+            "Install the project dependencies first; the first model run also "
+            "needs internet access unless the Hugging Face cache was pre-filled."
         ) from exc
     pairs = [(question, candidate) for candidate in candidates]
     scores = model.predict(pairs, show_progress_bar=False)
@@ -70,39 +104,51 @@ def rerank(question: str, candidates: list[str], keep: int) -> list[tuple[int, f
     return ranked[: min(keep, len(ranked))]
 
 
-# --- Retrieve: over-fetch candidates using the same vector search as 3b ---
-collection = chromadb.PersistentClient(path=str(ROOT / ".chroma-3")).get_collection(
-    COLLECTION, embedding_function=None
-)
-hits = collection.query(query_embeddings=embed([question]), n_results=TOP_N)
-candidates = hits["documents"][0]
-sources = [metadata["source"] for metadata in hits["metadatas"][0]]
+def main() -> None:
+    question = " ".join(sys.argv[1:]) or "What is a vector database?"
 
-# --- Re-rank: score question and chunk together, then keep the best TOP_K ---
-ranking = rerank(question, candidates, TOP_K)
-context = "\n\n".join(candidates[index] for index, _ in ranking)
+    # --- Retrieve: over-fetch candidates using the same vector search as 3b ---
+    collection = chromadb.PersistentClient(
+        path=str(ROOT / ".chroma-3")
+    ).get_collection(COLLECTION, embedding_function=None)
+    vector_hits = retrieve_candidates(collection, embed([question])[0])
+    candidates = [str(hit["document"]) for hit in vector_hits]
 
-print("[rerank] BGE cross-encoder ranking:")
-for rerank_position, (vector_index, score) in enumerate(ranking, start=1):
-    print(
-        f"- rerank {rerank_position}: vector {vector_index + 1}, "
-        f"score {score:.4f}, source {sources[vector_index]}"
+    # --- Re-rank: score question and chunk together, then keep the best TOP_K ---
+    ranking = rerank(question, candidates, TOP_K)
+    selected = [vector_hits[index] for index, _ in ranking]
+    context = "\n\n".join(str(hit["document"]) for hit in selected)
+
+    print("[rerank] BGE cross-encoder ranking:")
+    for rerank_position, ((vector_index, score), hit) in enumerate(
+        zip(ranking, selected), start=1
+    ):
+        print(
+            f"- rerank {rerank_position}: vector {hit['vector_rank']}, "
+            f"score {score:.4f}, source {hit['metadata']['source']}"
+        )
+
+    # --- Ask: identical answer generation to 3b ---
+    answer = client.chat.completions.create(
+        model=CHAT_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Answer the question using ONLY the context. "
+                    "If it is not in the context, say so."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"Context:\n{context}\n\nQuestion: {question}",
+            },
+        ],
     )
 
-# --- Ask: identical answer generation to 3b ---
-answer = client.chat.completions.create(
-    model=CHAT_MODEL,
-    messages=[
-        {
-            "role": "system",
-            "content": (
-                "Answer the question using ONLY the context. "
-                "If it is not in the context, say so."
-            ),
-        },
-        {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"},
-    ],
-)
+    print("\n" + (answer.choices[0].message.content or ""))
+    print("\nSources:", [hit["metadata"]["source"] for hit in selected])
 
-print("\n" + (answer.choices[0].message.content or ""))
-print("\nSources:", [sources[index] for index, _ in ranking])
+
+if __name__ == "__main__":
+    main()

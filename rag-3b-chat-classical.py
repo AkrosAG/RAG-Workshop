@@ -35,36 +35,61 @@ ROOT = Path(__file__).resolve().parent
 COLLECTION = os.getenv("RAG_COLLECTION", "rag_semantic")
 TOP_K = 4
 
-question = " ".join(sys.argv[1:]) or "What is a vector database?"
-
-
 def embed(texts: list[str]) -> list[list[float]]:
     """Embed the question with the same model used for the stored chunks."""
     resp = client.embeddings.create(model=EMBED_MODEL, input=texts)
     return [d.embedding for d in resp.data]
 
 
-# --- Retrieve: unchanged classical vector Top-K from rag-2b ---
-collection = chromadb.PersistentClient(path=str(ROOT / ".chroma-3")).get_collection(
-    COLLECTION, embedding_function=None
-)
-hits = collection.query(query_embeddings=embed([question]), n_results=TOP_K)
-context = "\n\n".join(hits["documents"][0])
+def retrieve_top_k(
+    collection: object, query_embedding: list[float], top_k: int = TOP_K
+) -> list[dict[str, object]]:
+    """Return exactly the available top-k vector hits in their original order."""
+    hits = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=top_k,
+        include=["documents", "metadatas"],
+    )
+    return [
+        {"document": document, "metadata": metadata}
+        for document, metadata in zip(
+            hits["documents"][0][:top_k],
+            hits["metadatas"][0][:top_k],
+        )
+    ]
 
-# --- Ask: answer only from the retrieved context ---
-answer = client.chat.completions.create(
-    model=CHAT_MODEL,
-    messages=[
-        {
-            "role": "system",
-            "content": (
-                "Answer the question using ONLY the context. "
-                "If it is not in the context, say so."
-            ),
-        },
-        {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"},
-    ],
-)
 
-print(answer.choices[0].message.content)
-print("\nSources:", [m["source"] for m in hits["metadatas"][0]])
+def main() -> None:
+    question = " ".join(sys.argv[1:]) or "What is a vector database?"
+
+    # --- Retrieve: unchanged classical vector Top-K from rag-2b ---
+    collection = chromadb.PersistentClient(
+        path=str(ROOT / ".chroma-3")
+    ).get_collection(COLLECTION, embedding_function=None)
+    hits = retrieve_top_k(collection, embed([question])[0])
+    context = "\n\n".join(str(hit["document"]) for hit in hits)
+
+    # --- Ask: answer only from the retrieved context ---
+    answer = client.chat.completions.create(
+        model=CHAT_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Answer the question using ONLY the context. "
+                    "If it is not in the context, say so."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"Context:\n{context}\n\nQuestion: {question}",
+            },
+        ],
+    )
+
+    print(answer.choices[0].message.content)
+    print("\nSources:", [hit["metadata"]["source"] for hit in hits])
+
+
+if __name__ == "__main__":
+    main()
