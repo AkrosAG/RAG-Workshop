@@ -1,3 +1,5 @@
+## SQL query for semantic chunking integrity
+
 WITH chunks AS (
     SELECT
         e.embedding_id AS chunk_id,
@@ -52,3 +54,22 @@ ORDER BY chunk_no;
 
 
 
+## Verbesserungsvorschlag AI-basiert:
+Die Chunks sind im Sinne des aktuellen Algorithmus korrekt gespeichert:
+keine verlorenen Daten
+keine veralteten Chunks
+keine leeren Chunks
+keine durch Stage 3 erzeugten Worttrennungen
+Überschriften beginnen jeweils einen neuen Chunk
+Für gutes semantisches Retrieval sind sie aber nur teilweise optimal:
+40,7 % überschreiten das Größenbudget
+1.694 Chunks enthalten mehrere Artikel
+Inhaltsverzeichnisse erzeugen Chunks mit mehr als 3.000 Zeichen
+viele Fussnoten und Quellenhinweise bilden eigene Mini-Chunks
+Die sinnvollste Verbesserung wäre:
+Markdown-Blöcke
+  → Inhaltsverzeichnisse und isolierte Fussnoten erkennen
+  → primär an Art.-Überschriften trennen
+  → übergroße Artikelblöcke zusätzlich an Satzgrenzen trennen
+  → kleine zusammengehörige Blöcke bis zum Budget zusammenführen
+Damit würden Artikel möglichst vollständig bleiben, ohne dass ein Chunk gleichzeitig acht verschiedene Artikel oder ganze Inhaltsverzeichnisse enthält. Ich habe bei dieser Prüfung noch nichts verändert.
