@@ -152,6 +152,25 @@ Ein Re-Rank-Score kann nicht beim Ingest vorberechnet werden: Anders als ein
 Embedding verarbeitet der Cross-Encoder Frage und Chunk gemeinsam. Das
 Re-Ranking findet deshalb bei jeder Abfrage statt.
 
+### Optional: artikelorientiertes Legal-Chunking
+
+`rag-3a-ingest-legal.py` ist eine alternative Chunking-Variante für den
+Fedlex-Korpus. Sie entfernt offensichtliche Inhaltsverzeichnis- und
+Referenzfragmente, trennt primär an `Art.`-Überschriften, teilt übergrosse
+Artikel an Satz- beziehungsweise Wortgrenzen und führt kleine
+zusammengehörige Blöcke bis zum Grössenbudget zusammen. Der bestehende
+Stage-3-Index bleibt unverändert.
+
+```bash
+# Nur Chunks erzeugen und Qualitätsstatistik ausgeben:
+poetry run python rag-3a-ingest-legal.py --dry-run
+
+# Separate ChromaDB inklusive Embeddings aufbauen:
+poetry run python rag-3a-ingest-legal.py
+```
+
+Die Alternative schreibt nach `.chroma-legal` in die Collection `rag_legal`.
+
 ## GraphRAG
 
 Die GraphRAG-Stufe verwendet bewusst kein Graph-Framework. Dadurch bleibt die

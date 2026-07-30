@@ -1,6 +1,7 @@
 # Local secrets and state
 .env
 .chroma/
+.chroma-legal/
 .cache/
 **/.ipynb_checkpoints/
 
