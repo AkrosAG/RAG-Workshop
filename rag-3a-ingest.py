@@ -31,7 +31,7 @@ from openai import OpenAI
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
 CHROMA_PATH = ROOT / ".chroma-3"
-COLLECTION = "rag_legal"
+COLLECTION = "rag_semantic"
 MAX_CHUNK_SIZE = 800
 EMBED_BATCH_SIZE = int(os.getenv("EMBED_BATCH_SIZE", "64"))
 

@@ -38,7 +38,7 @@ client = OpenAI(
 )
 
 ROOT = Path(__file__).resolve().parent
-COLLECTION = os.getenv("RAG_COLLECTION", "rag_legal")
+COLLECTION = os.getenv("RAG_COLLECTION", "rag_semantic")
 TOP_N = 10
 TOP_K = 4
 
