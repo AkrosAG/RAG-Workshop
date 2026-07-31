@@ -165,6 +165,8 @@ Workshop-Skripte selbst; CPU-Inferenz funktioniert, eine unterstützte GPU
 beschleunigt das Re-Ranking. Über `RERANK_MODEL` kann ein anderes kompatibles
 Cross-Encoder-Modell gewählt werden.
 
+Alternativ kann das Re-Ranking über einen Jina-kompatiblen Remote-Endpoint laufen: `RERANK_URL` auf den Endpoint setzen und `RERANK_MODEL` auf das dortige Modell (siehe `.env.example`, für Marvin: `NexaAI/jina-v2-rerank-mlx`). Damit entfallen Modell-Download und lokale Inferenz; dafür braucht der virtuelle Key Zugriff auf das Rerank-Modell.
+
 Für eine Workshopumgebung ohne verlässlichen Internetzugang sollte der
 Modell-Cache vorab gefüllt werden. Auf jedem Workshop-Rechner einmal ausführen:
 

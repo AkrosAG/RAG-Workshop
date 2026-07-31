@@ -9,7 +9,9 @@ Builds on rag-3b-chat-classical.py and changes only candidate ranking:
 Unlike an embedding model, a cross-encoder reads the question and passage
 together. Its relevance scores therefore have to be computed at query time.
 
-The re-ranker model is downloaded on first use and then cached locally.
+By default the re-ranker model runs locally; it is downloaded on first use
+and then cached. Set RERANK_URL (plus a matching RERANK_MODEL) to score the
+pairs on a Jina-style remote reranking endpoint instead.
 
 Run:  poetry run python rag-3c-chat-rerank.py "What is a vector database?"
 """
@@ -32,6 +34,7 @@ sys.excepthook = lambda exc_type, exc, _: sys.exit(f"{exc_type.__name__}: {exc}"
 CHAT_MODEL = os.getenv("LLM_MODEL", "llama3.2")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
 RERANK_MODEL = os.getenv("RERANK_MODEL", "BAAI/bge-reranker-v2-m3")
+RERANK_URL = os.getenv("RERANK_URL", "")
 client = OpenAI(
     base_url=os.getenv("LLM_BASE_URL", "http://localhost:11434/v1"),
     api_key=os.getenv("LLM_API_KEY", "ollama"),
@@ -73,13 +76,40 @@ def retrieve_candidates(
     ]
 
 
-def rerank(
+def score_remote(question: str, candidates: list[str]) -> list[float]:
+    """Score pairs on a Jina-style reranking endpoint (POST query+documents)."""
+    import httpx
+
+    response = httpx.post(
+        RERANK_URL,
+        headers={
+            "Authorization": f"Bearer {os.getenv('LLM_API_KEY', '')}"
+        },
+        json={
+            "model": RERANK_MODEL,
+            "query": question,
+            "documents": candidates,
+        },
+        timeout=60,
+    )
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Remote reranker '{RERANK_MODEL}' at {RERANK_URL} answered "
+            f"{response.status_code}: {response.text[:200]}"
+        )
+    scores = [0.0] * len(candidates)
+    for item in response.json()["results"]:
+        score = item.get("relevance_score", item.get("score", 0.0))
+        scores[item["index"]] = float(score)
+    return scores
+
+
+def score_local(
     question: str,
     candidates: list[str],
-    keep: int,
     model_factory: Callable[[str], object] | None = None,
-) -> list[tuple[int, float]]:
-    """Return (candidate index, score), ordered by cross-encoder relevance."""
+) -> list[float]:
+    """Score pairs with the local cross-encoder."""
     if model_factory is None:
         def model_factory(model_name: str) -> object:
             from sentence_transformers import CrossEncoder
@@ -95,7 +125,20 @@ def rerank(
             "needs internet access unless the Hugging Face cache was pre-filled."
         ) from exc
     pairs = [(question, candidate) for candidate in candidates]
-    scores = model.predict(pairs, show_progress_bar=False)
+    return model.predict(pairs, show_progress_bar=False)
+
+
+def rerank(
+    question: str,
+    candidates: list[str],
+    keep: int,
+    model_factory: Callable[[str], object] | None = None,
+) -> list[tuple[int, float]]:
+    """Return (candidate index, score), ordered by re-ranker relevance."""
+    if RERANK_URL and model_factory is None:
+        scores = score_remote(question, candidates)
+    else:
+        scores = score_local(question, candidates, model_factory)
     ranked = sorted(
         ((index, float(score)) for index, score in enumerate(scores)),
         key=lambda item: item[1],
@@ -119,7 +162,8 @@ def main() -> None:
     selected = [vector_hits[index] for index, _ in ranking]
     context = "\n\n".join(str(hit["document"]) for hit in selected)
 
-    print("[rerank] BGE cross-encoder ranking:")
+    where = "remote" if RERANK_URL else "local"
+    print(f"[rerank] {RERANK_MODEL} ({where}) ranking:")
     for rerank_position, ((vector_index, score), hit) in enumerate(
         zip(ranking, selected), start=1
     ):
