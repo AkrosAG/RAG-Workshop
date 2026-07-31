@@ -6,14 +6,14 @@ article text at sentence or word boundaries, and packs small related blocks.
 
 It deliberately writes to a separate store and collection:
 
-    Chroma path:  .chroma-legal
-    Collection:   rag_legal
+    Chroma path:  .chroma-semantic
+    Collection:   rag_semantic
 
 Dry-run without embeddings:
-    poetry run python rag-3a-ingest-legal.py --dry-run
+    poetry run python rag-3a-ingest.py --dry-run
 
 Build/update the separate Chroma database:
-    poetry run python rag-3a-ingest-legal.py
+    poetry run python rag-3a-ingest.py
 """
 
 import argparse
@@ -315,7 +315,7 @@ def synchronize() -> None:
             metadatas=[metadatas[index] for index in batch],
         )
         print(
-            f"[ingest-legal] embedded "
+            f"[ingest] embedded "
             f"{min(start + len(batch), len(changed))}/{len(changed)}"
         )
 
@@ -323,7 +323,7 @@ def synchronize() -> None:
         collection.delete(ids=obsolete[start : start + 500])
 
     print(
-        f"[ingest-legal] synchronized {len(changed)} changed/new and "
+        f"[ingest] synchronized {len(changed)} changed/new and "
         f"removed {len(obsolete)} obsolete chunk(s); "
         f"'{COLLECTION}' now holds {collection.count()}"
     )
