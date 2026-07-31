@@ -24,6 +24,9 @@ from graph_retrieval import (
 
 sys.excepthook = lambda exc_type, exc, _: sys.exit(f"{exc_type.__name__}: {exc}")
 
+# Redirected stdout on Windows defaults to cp1252; model output needs UTF-8.
+sys.stdout.reconfigure(encoding="utf-8")
+
 ROOT = Path(__file__).resolve().parent
 CITATION_RE = re.compile(
     r"\[(?P<source>SR_[^\]\s]+\.md)\s+Art\.\s*"

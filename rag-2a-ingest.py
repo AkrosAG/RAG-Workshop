@@ -23,6 +23,9 @@ load_dotenv()
 # Minimal error handling: print one line instead of a stack trace.
 sys.excepthook = lambda exc_type, exc, _: sys.exit(f"{exc_type.__name__}: {exc}")
 
+# Redirected stdout on Windows defaults to cp1252; model output needs UTF-8.
+sys.stdout.reconfigure(encoding="utf-8")
+
 # --- Configuration (as in rag-1-chat.py, plus embedding/store settings) ---
 EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
 client = OpenAI(

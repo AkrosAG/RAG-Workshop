@@ -17,6 +17,9 @@ from graph_retrieval import build_graph, save_graph
 
 sys.excepthook = lambda exc_type, exc, _: sys.exit(f"{exc_type.__name__}: {exc}")
 
+# Redirected stdout on Windows defaults to cp1252; model output needs UTF-8.
+sys.stdout.reconfigure(encoding="utf-8")
+
 ROOT = Path(__file__).resolve().parent
 COLLECTION = os.getenv("RAG_COLLECTION", "rag_semantic")
 GRAPH_PATH = ROOT / ".chroma-3" / f"{COLLECTION}_graph.json"

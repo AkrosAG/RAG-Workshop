@@ -18,6 +18,9 @@ load_dotenv()
 # Minimal error handling: print one line instead of a stack trace.
 sys.excepthook = lambda exc_type, exc, _: sys.exit(f"{exc_type.__name__}: {exc}")
 
+# Redirected stdout on Windows defaults to cp1252; model output needs UTF-8.
+sys.stdout.reconfigure(encoding="utf-8")
+
 # --- Configuration (shared by all stages) ---
 CHAT_MODEL = os.getenv("LLM_MODEL", "llama3.2")
 client = OpenAI(
