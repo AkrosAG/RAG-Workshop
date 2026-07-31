@@ -19,9 +19,9 @@ sys.excepthook = lambda exc_type, exc, _: sys.exit(f"{exc_type.__name__}: {exc}"
 
 ROOT = Path(__file__).resolve().parent
 COLLECTION = os.getenv("RAG_COLLECTION", "rag_semantic")
-GRAPH_PATH = ROOT / ".chroma" / f"{COLLECTION}_graph.json"
+GRAPH_PATH = ROOT / ".chroma-3" / f"{COLLECTION}_graph.json"
 
-collection = chromadb.PersistentClient(path=str(ROOT / ".chroma")).get_collection(
+collection = chromadb.PersistentClient(path=str(ROOT / ".chroma-3")).get_collection(
     COLLECTION, embedding_function=None
 )
 graph = build_graph(collection)

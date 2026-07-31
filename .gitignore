@@ -2,6 +2,7 @@
 .env
 .chroma/
 .chroma-legal/
+.chroma-3/*_graph.json
 .cache/
 **/.ipynb_checkpoints/
 

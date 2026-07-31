@@ -78,6 +78,10 @@ SOURCE_ALIASES = {
 }
 MIN_ARTICLE_SCORE = 2.0
 RRF_CONSTANT = 60
+QUESTION_CITATION_RE = re.compile(
+    r"\bart(?:ikel|\.)?\s*(\d{1,4})\s*((?:bis|ter|quater)\b|[a-z]\b)?",
+    re.IGNORECASE,
+)
 
 
 def _chunk_number(chunk_id: str) -> int:
@@ -431,6 +435,85 @@ def lexical_article_retrieve(
     return hits
 
 
+def _definition_chunks(graph: dict[str, Any]) -> dict[tuple[str, str], str]:
+    """Map (source, article) to the chunk holding its canonical definition."""
+    lookup: dict[tuple[str, str], str] = {}
+    for chunk_id, articles in graph.get("article_definitions", {}).items():
+        source = chunk_id.rsplit("::", 1)[0]
+        for article in articles:
+            lookup.setdefault((source, article), chunk_id)
+    return lookup
+
+
+def cited_article_retrieve(
+    collection: Any,
+    graph: dict[str, Any],
+    question: str,
+    limit: int = 2,
+) -> list[dict[str, Any]]:
+    """Resolve explicit citations such as "Artikel 1 OR" to definition chunks.
+
+    Embeddings cannot match bare article numbers, so questions that cite an
+    article directly are answered from the graph's definition index instead.
+    A citation only resolves when the question names the law (SOURCE_ALIASES)
+    or when the article number is unique across the whole corpus.
+    """
+    citations: list[str] = []
+    for number, suffix in QUESTION_CITATION_RE.findall(question):
+        article = f"{number}{suffix.casefold()}"
+        if article not in citations:
+            citations.append(article)
+    if not citations or limit <= 0:
+        return []
+
+    lookup = _definition_chunks(graph)
+    query_tokens = set(_search_tokens(question))
+    named_sources = sorted(
+        source
+        for source in {source for source, _ in lookup}
+        if _source_matches_query(_source_terms(source), query_tokens)
+    )
+
+    chunk_ids: list[str] = []
+    for article in citations:
+        if named_sources:
+            targets = [
+                lookup[(source, article)]
+                for source in named_sources
+                if (source, article) in lookup
+            ]
+        else:
+            # Without a named law only an unambiguous number may resolve.
+            targets = [
+                chunk_id
+                for (_, candidate), chunk_id in sorted(lookup.items())
+                if candidate == article
+            ]
+            if len(targets) > 1:
+                targets = []
+        chunk_ids.extend(
+            chunk_id for chunk_id in targets if chunk_id not in chunk_ids
+        )
+
+    hits = []
+    for chunk_id in chunk_ids[:limit]:
+        result = collection.get(
+            ids=[chunk_id], include=["documents", "metadatas"]
+        )
+        if not result["ids"]:
+            continue
+        hits.append(
+            {
+                "id": chunk_id,
+                "document": result["documents"][0],
+                "metadata": result["metadatas"][0],
+                "distance": None,
+                "via": "cited-article",
+            }
+        )
+    return hits
+
+
 def _merge_hybrid_hits(
     vector_hits: list[dict[str, Any]],
     article_hits: list[dict[str, Any]],
@@ -471,15 +554,21 @@ def graph_retrieve(
     article_limit: int = 2,
     context_limit: int = 6,
 ) -> list[dict[str, Any]]:
-    """Merge vector and lexical article hits, then expand graph neighbours."""
+    """Merge cited, vector and lexical article hits, then expand neighbours."""
     seeds = vector_retrieve(collection, query_embedding, seed_limit)
+    cited_hits = cited_article_retrieve(
+        collection, graph, question, article_limit
+    )
     article_hits = lexical_article_retrieve(
         article_index or [], question, article_limit
     )
     hybrid_hits = _merge_hybrid_hits(seeds, article_hits)
-    selected = {
-        hit["id"]: hit for hit in hybrid_hits[:context_limit]
-    }
+    # Explicit citations are exact lookups and outrank every fuzzy ranking.
+    selected = {hit["id"]: hit for hit in cited_hits[:context_limit]}
+    for hit in hybrid_hits:
+        if len(selected) >= context_limit:
+            break
+        selected.setdefault(hit["id"], hit)
     neighbour_candidates: list[tuple[int, int, str, str]] = []
 
     kind_priority = {"references": 0, "previous": 1, "next": 1}

@@ -4,6 +4,7 @@ from evaluate import cited_article_pairs, score_answer, score_retrieval
 from graph_retrieval import (
     _merge_hybrid_hits,
     build_graph,
+    cited_article_retrieve,
     lexical_article_retrieve,
 )
 
@@ -385,6 +386,64 @@ class HybridArticleRetrievalTest(unittest.TestCase):
         merged = _merge_hybrid_hits(vector, lexical)
 
         self.assertEqual([hit["id"] for hit in merged], ["vector::1", "article::1"])
+
+
+class CitedFakeCollection:
+    documents = {
+        "SR_220_OR_de.md::1": "Art. 1\nVertragsabschluss durch Willensäusserung.",
+        "SR_210_ZGB_de.md::5": "Art. 1\nAnwendung des Rechts.",
+        "SR_210_ZGB_de.md::20": "Art. 14\nVolljährig ist, wer 18 Jahre alt ist.",
+    }
+
+    def get(self, ids=None, include=None):
+        found = [chunk_id for chunk_id in ids if chunk_id in self.documents]
+        return {
+            "ids": found,
+            "documents": [self.documents[chunk_id] for chunk_id in found],
+            "metadatas": [
+                {"source": chunk_id.rsplit("::", 1)[0]} for chunk_id in found
+            ],
+        }
+
+
+class CitedArticleRetrievalTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.collection = CitedFakeCollection()
+        self.graph = {
+            "article_definitions": {
+                "SR_220_OR_de.md::1": ["1"],
+                "SR_210_ZGB_de.md::5": ["1"],
+                "SR_210_ZGB_de.md::20": ["14"],
+            }
+        }
+
+    def retrieve(self, question: str) -> list[str]:
+        hits = cited_article_retrieve(self.collection, self.graph, question)
+        return [hit["id"] for hit in hits]
+
+    def test_cited_article_with_law_name_resolves(self) -> None:
+        self.assertEqual(
+            self.retrieve("Was steht in Artikel 1 des OR?"),
+            ["SR_220_OR_de.md::1"],
+        )
+
+    def test_cited_article_with_abbreviated_form_resolves(self) -> None:
+        self.assertEqual(
+            self.retrieve("Was steht in Art. 14 ZGB?"),
+            ["SR_210_ZGB_de.md::20"],
+        )
+
+    def test_ambiguous_article_without_law_name_is_skipped(self) -> None:
+        self.assertEqual(self.retrieve("Was steht in Artikel 1?"), [])
+
+    def test_unique_article_without_law_name_resolves(self) -> None:
+        self.assertEqual(
+            self.retrieve("Was steht in Artikel 14?"),
+            ["SR_210_ZGB_de.md::20"],
+        )
+
+    def test_question_without_citation_returns_nothing(self) -> None:
+        self.assertEqual(self.retrieve("Wann ist eine Person volljährig?"), [])
 
 
 if __name__ == "__main__":

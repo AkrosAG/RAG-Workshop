@@ -433,9 +433,9 @@ def main() -> None:
     embed_model = os.getenv("EMBED_MODEL", "bge-m3")
     chat_model = os.getenv("LLM_MODEL", "llama3.2")
     collection = chromadb.PersistentClient(
-        path=str(ROOT / ".chroma")
+        path=str(ROOT / ".chroma-3")
     ).get_collection(args.collection, embedding_function=None)
-    graph = load_graph(ROOT / ".chroma" / f"{args.collection}_graph.json")
+    graph = load_graph(ROOT / ".chroma-3" / f"{args.collection}_graph.json")
     if graph.get("version") != GRAPH_VERSION:
         sys.exit(
             "Graph format is outdated. Rebuild it with: "

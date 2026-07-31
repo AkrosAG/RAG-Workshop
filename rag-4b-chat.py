@@ -1,7 +1,8 @@
 """Stage 4b - Hybrid GraphRAG chat.
 
-Merges semantic vector seeds with lexically matched legal articles, then adds
-graph neighbours and reference targets.
+Merges semantic vector seeds with lexically matched legal articles and
+explicitly cited articles ("Artikel 1 OR"), then adds graph neighbours and
+reference targets.
 
 Run rag-3a-ingest.py and rag-4a-graph.py first.
 
@@ -30,7 +31,7 @@ sys.excepthook = lambda exc_type, exc, _: sys.exit(f"{exc_type.__name__}: {exc}"
 
 ROOT = Path(__file__).resolve().parent
 COLLECTION = os.getenv("RAG_COLLECTION", "rag_semantic")
-GRAPH_PATH = ROOT / ".chroma" / f"{COLLECTION}_graph.json"
+GRAPH_PATH = ROOT / ".chroma-3" / f"{COLLECTION}_graph.json"
 CHAT_MODEL = os.getenv("LLM_MODEL", "llama3.2")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
 SEED_K = int(os.getenv("GRAPH_SEED_K", "3"))
@@ -43,7 +44,7 @@ client = OpenAI(
 )
 question = " ".join(sys.argv[1:]) or "Wie lange dauert die Probezeit?"
 
-collection = chromadb.PersistentClient(path=str(ROOT / ".chroma")).get_collection(
+collection = chromadb.PersistentClient(path=str(ROOT / ".chroma-3")).get_collection(
     COLLECTION, embedding_function=None
 )
 graph = load_graph(GRAPH_PATH)

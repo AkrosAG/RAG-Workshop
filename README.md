@@ -191,10 +191,11 @@ Mechanik im Workshop sichtbar:
 2. `rag-4a-graph.py` verbindet aufeinanderfolgende Chunks derselben Quelle und
    erkannte Gesetzesverweise wie `Art. 25`.
 3. `rag-4b-chat.py` sucht semantische Vektor-Seeds.
-4. Ein kleiner BM25-ähnlicher Index sucht parallel in den normalisierten
+4. Explizit zitierte Artikel in der Frage („Was steht in Artikel 1 des OR?") werden über den Artikel-Definitions-Index des Graphen exakt aufgelöst und priorisiert in den Kontext übernommen. Embeddings können blosse Artikelnummern nicht zuverlässig matchen; ohne genannten Erlass wird nur eine korpusweit eindeutige Nummer aufgelöst.
+5. Ein kleiner BM25-ähnlicher Index sucht parallel in den normalisierten
    Artikel-Chunks. Erlassnamen und Abkürzungen wie `ZGB`, `StGB` oder `MWSTG`
    verstärken nur Artikel, die zugleich einen inhaltlichen Texttreffer haben.
-5. Beide Rankings werden mit klassischer Reciprocal Rank Fusion dedupliziert
+6. Beide Rankings werden mit klassischer Reciprocal Rank Fusion dedupliziert
    zusammengeführt und anschließend um relevante Nachbar- und
    Referenz-Chunks aus dem Graph ergänzt.
 
@@ -209,7 +210,7 @@ poetry run python rag-4b-chat.py \
 Stufe für Fixed-Size-Chunking. Sie sind weder Voraussetzung für GraphRAG noch
 Teil der Vector-RAG-vs.-GraphRAG-Evaluation.
 
-Der Graph wird lokal unter `.chroma/rag_semantic_graph.json` gespeichert und
+Der Graph wird lokal unter `.chroma-3/rag_semantic_graph.json` gespeichert und
 nicht versioniert. Mit `GRAPH_SEED_K` und `GRAPH_CONTEXT_K` lässt sich steuern,
 wie viele Vektor-Treffer und Chunks insgesamt in den Kontext gelangen.
 `GRAPH_ARTICLE_K` steuert die Zahl lexikalischer Artikelkandidaten
