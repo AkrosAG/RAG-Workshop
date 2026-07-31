@@ -10,9 +10,9 @@ rag-1-chat.py          Backbone: Modell anbinden, einen Prompt absetzen
 rag-2a-ingest.py       + Ingest: Fixed-Size-Chunking → Embedding-DB (Chroma, file-based)
 rag-2b-chat.py         + Retrieval: Abfrage mit passenden Chunks anreichern (= RAG)
    │
-rag-3a-ingest.py       Verfeinerung Ingest: semantisches Chunking (Absätze/Überschriften)
+rag-3a-ingest.py       Verfeinerung Ingest: artikelorientiertes Legal-Chunking
 rag-3b-chat-classical.py
-                       Klassische Vector-Top-K-Abfrage auf den semantischen Chunks
+                       Klassische Vector-Top-K-Abfrage auf den Legal-Chunks
 rag-3c-chat-rerank.py  Over-Fetch + Re-Ranking mit einem BGE-Cross-Encoder
    │
 rag-4a-graph.py        Graph: Nachbar-Chunks + explizite Gesetzesverweise
@@ -26,8 +26,8 @@ rag-4b-chat.py         Hybrid GraphRAG: Vektor + Artikelsuche → Graph → Antw
 | `rag-1-chat.py` | — | OpenAI-kompatibler Client, eine Chat-Anfrage |
 | `rag-2a-ingest.py` | rag-1 | `chunk()` (fix), `embed()`, idempotentes Befüllen von Chroma (`rag_fixed`) |
 | `rag-2b-chat.py` | rag-1 + 2a | Frage embedden → Top-K-Chunks holen → als Kontext in den Prompt |
-| `rag-3a-ingest.py` | rag-2a | nur `chunk()` geändert: struktur-/absatzbewusst (Collection `rag_semantic`) |
-| `rag-3b-chat-classical.py` | rag-2b + 3a | unveränderte Vector-Top-K-Abfrage auf den semantischen Chunks |
+| `rag-3a-ingest.py` | rag-2a | artikelorientiertes Chunking für Fedlex: Rauschen filtern, an `Art.` trennen, übergrosse Artikel sicher teilen (Collection `rag_semantic`) |
+| `rag-3b-chat-classical.py` | rag-2b + 3a | unveränderte Vector-Top-K-Abfrage auf den artikelorientierten Chunks |
 | `rag-3c-chat-rerank.py` | rag-3b | Over-Fetch (Top-10) + dynamisches BGE-Re-Ranking von Frage und Chunk → beste 4 |
 | `rag-4a-graph.py` | rag-3a | baut einen transparenten Retrieval-Graph aus Nachbarschaft und `Art.`-Verweisen |
 | `rag-4b-chat.py` | rag-4a | kombiniert Vektor- und lexikalische Artikeltreffer und erweitert sie über Graph-Kanten |
@@ -65,7 +65,8 @@ Dann die Stufen der Reihe nach (mit venv statt Poetry: `python ...` direkt):
 poetry run python rag-1-chat.py "Why is the sky blue?"      # 1: Backbone
 poetry run python rag-2a-ingest.py                            # 2a: Index bauen
 poetry run python rag-2b-chat.py "What is a vector database?" # 2b: RAG
-poetry run python rag-3a-ingest.py                            # 3a: semantischer Index
+poetry run python rag-3a-ingest.py --dry-run                  # 3a: Chunks ohne API-Aufruf prüfen
+poetry run python rag-3a-ingest.py                            # 3a: artikelorientierten Index bauen
 poetry run python rag-3b-chat-classical.py "What is a vector database?" # 3b: Vector Top-K
 poetry run python rag-3c-chat-rerank.py "What is a vector database?" # 3c: BGE-Re-Ranking
 poetry run python rag-4a-graph.py                              # 4a: Graph bauen
@@ -107,7 +108,9 @@ python rag-2a-ingest.py
 
 Der Konverter lässt die Original-PDFs unverändert, bereinigt typische
 PDF-Zeilentrennungen und ergänzt Seitenmarker. Danach finden `rag-2a-ingest.py`
-und `rag-3a-ingest.py` die erzeugten `data/SR_*.md` automatisch.
+und `rag-3a-ingest.py` die erzeugten `data/SR_*.md` automatisch. Stage 3
+entfernt die Seitenmarker beim Chunking wieder, damit sie nicht im
+Retrieval-Kontext landen.
 
 Die Ingestion verarbeitet den großen Rechtskorpus in Batches von 64 Chunks.
 Bei Bedarf lässt sich die Größe über `EMBED_BATCH_SIZE` reduzieren.
@@ -115,10 +118,35 @@ Bei Bedarf lässt sich die Größe über `EMBED_BATCH_SIZE` reduzieren.
 ## Klassisches Retrieval und Re-Ranking
 
 Stufe 3 trennt zwei Verbesserungen bewusst voneinander. `rag-3a-ingest.py`
-verbessert ausschliesslich das Chunking. `rag-3b-chat-classical.py` fragt
-diesen semantischen Index weiterhin mit der klassischen Vektorsuche ab und
-verwendet die vier ähnlichsten Chunks direkt als Kontext. Alle drei Skripte
-der Stufe 3 verwenden dafür den getrennten Chroma-Speicher `.chroma-3`.
+verbessert ausschliesslich das Chunking für Gesetzestexte:
+
+- PDF-Seitenmarker, offensichtliche Inhaltsverzeichnisse und isolierte
+  Fedlex-Quellenfragmente werden nicht indexiert.
+- Eine Zeile mit `Art. <Nummer>` beginnt primär einen neuen Chunk.
+- Ein Artikel bleibt bis zum Grössenbudget von 800 Zeichen zusammen.
+- Übergrosse Artikel werden bevorzugt an Absätzen, nummerierten Bestimmungen
+  und Satzgrenzen geteilt; Fortsetzungen behalten die Artikelbezeichnung.
+- Kleine zusammengehörige Textblöcke werden bis zum Budget kombiniert.
+
+Mit `--dry-run` lassen sich Anzahl und Längen der erzeugten Chunks sowie leere,
+übergrosse oder mehrere Artikel enthaltende Chunks prüfen, ohne Embeddings zu
+erzeugen oder Chroma zu verändern:
+
+```bash
+poetry run python rag-3a-ingest.py --dry-run
+poetry run python rag-3a-ingest.py
+```
+
+Der Stage-3-Index liegt unter `.chroma-3`; die Collection heisst trotz der
+neuen Chunking-Strategie weiterhin `rag_semantic`. Die Metadaten jedes Chunks
+enthalten zusätzlich `chunk_strategy=legal-article-v1`.
+
+`rag-3b-chat-classical.py` fragt diesen Index weiterhin nur mit klassischer
+Vektorsuche ab und verwendet die vier ähnlichsten Chunks direkt als Kontext.
+Das Legal-Chunking verbessert die Artikelgrenzen, garantiert bei kurzen,
+mehrdeutigen Fragen wie `Was steht in Art. 1 OR?` aber noch keinen exakten
+Artikeltreffer: 3b wertet Gesetzesabkürzung und Artikelnummer nicht als
+strukturierte Filter aus.
 
 `rag-3c-chat-rerank.py` holt zunächst zehn Vektorkandidaten. Anschliessend
 bewertet `BAAI/bge-reranker-v2-m3` jedes Paar aus Frage und Chunk gemeinsam und
@@ -127,8 +155,8 @@ Chunks gelangen in den Antwort-Prompt:
 
 ```text
 2b: Fixed-Size-Chunks → Vector Top-4
-3b: Semantic Chunks   → Vector Top-4
-3c: Semantic Chunks   → Vector Top-10 → BGE-Re-Ranking → Top-4
+3b: Legal Chunks      → Vector Top-4
+3c: Legal Chunks      → Vector Top-10 → BGE-Re-Ranking → Top-4
 ```
 
 Der Cross-Encoder wird beim ersten Start heruntergeladen und danach im lokalen
@@ -150,26 +178,9 @@ kann wegen des Modelldownloads deutlich länger dauern.
 
 Ein Re-Rank-Score kann nicht beim Ingest vorberechnet werden: Anders als ein
 Embedding verarbeitet der Cross-Encoder Frage und Chunk gemeinsam. Das
-Re-Ranking findet deshalb bei jeder Abfrage statt.
-
-### Optional: artikelorientiertes Legal-Chunking
-
-`rag-3a-ingest-legal.py` ist eine alternative Chunking-Variante für den
-Fedlex-Korpus. Sie entfernt offensichtliche Inhaltsverzeichnis- und
-Referenzfragmente, trennt primär an `Art.`-Überschriften, teilt übergrosse
-Artikel an Satz- beziehungsweise Wortgrenzen und führt kleine
-zusammengehörige Blöcke bis zum Grössenbudget zusammen. Der bestehende
-Stage-3-Index bleibt unverändert.
-
-```bash
-# Nur Chunks erzeugen und Qualitätsstatistik ausgeben:
-poetry run python rag-3a-ingest-legal.py --dry-run
-
-# Separate ChromaDB inklusive Embeddings aufbauen:
-poetry run python rag-3a-ingest-legal.py
-```
-
-Die Alternative schreibt nach `.chroma-legal` in die Collection `rag_legal`.
+Re-Ranking findet deshalb bei jeder Abfrage statt. Der Reranker kann nur die
+zehn zuvor von der Vektorsuche gelieferten Kandidaten neu sortieren; einen dort
+fehlenden Artikel kann er nicht nachträglich aus der Collection holen.
 
 ## GraphRAG
 
@@ -249,11 +260,10 @@ dasselbe Budget von sechs Chunks (`--context-k`), damit der Vergleich fair
 bleibt. `--graph-seed-k` bestimmt, wie viele davon zunächst über die
 Vektorsuche gewählt werden.
 
-Die Chat-Skripte können auf beide Indizes zeigen — so lassen sich die
-Chunking-Strategien direkt vergleichen:
+Die Stage-3-Chats verwenden standardmässig den von `rag-3a-ingest.py`
+erzeugten Index:
 
 ```bash
-RAG_COLLECTION=rag_semantic poetry run python rag-2b-chat.py "..."
 RAG_COLLECTION=rag_semantic poetry run python rag-3b-chat-classical.py "..."
 RAG_COLLECTION=rag_semantic poetry run python rag-3c-chat-rerank.py "..."
 ```
