@@ -38,7 +38,7 @@ client = OpenAI(
 )
 
 ROOT = Path(__file__).resolve().parent
-COLLECTION = os.getenv("RAG_COLLECTION", "rag_semantic")
+COLLECTION = os.getenv("RAG_COLLECTION", "rag_legal")
 TOP_N = 10
 TOP_K = 4
 
@@ -105,7 +105,7 @@ def rerank(
 
 
 def main() -> None:
-    question = " ".join(sys.argv[1:]) or "What is a vector database?"
+    question = " ".join(sys.argv[1:]) or "Wann ist eine Person volljährig?"
 
     # --- Retrieve: over-fetch candidates using the same vector search as 3b ---
     collection = chromadb.PersistentClient(
