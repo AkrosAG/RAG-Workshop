@@ -1,6 +1,12 @@
 import unittest
 
-from evaluate import cited_article_pairs, score_answer, score_retrieval
+from evaluate import (
+    cited_article_pairs,
+    rerank_hits,
+    resolve_methods,
+    score_answer,
+    score_retrieval,
+)
 from graph_retrieval import (
     _merge_hybrid_hits,
     build_graph,
@@ -26,6 +32,47 @@ CASE = {
         },
     ],
 }
+
+
+class WorkshopStageTest(unittest.TestCase):
+    def test_stages_accumulate_previous_rags(self) -> None:
+        self.assertEqual(resolve_methods("fixed", None), ("fixed-vector",))
+        self.assertEqual(
+            resolve_methods("semantic", None),
+            ("fixed-vector", "semantic-vector"),
+        )
+        self.assertEqual(
+            resolve_methods("rerank", None),
+            ("fixed-vector", "semantic-vector", "rerank"),
+        )
+        self.assertEqual(
+            resolve_methods("graph", None),
+            ("fixed-vector", "semantic-vector", "rerank", "graph"),
+        )
+
+    def test_explicit_methods_override_stage_and_use_canonical_order(self) -> None:
+        self.assertEqual(
+            resolve_methods("graph", ["graph", "semantic-vector"]),
+            ("semantic-vector", "graph"),
+        )
+
+    def test_reranker_reorders_candidates_and_keeps_budget(self) -> None:
+        class FakeReranker:
+            def score(self, question, documents):
+                self.question = question
+                self.documents = documents
+                return [0.1, 0.9, 0.4]
+
+        candidates = [
+            {"id": "a", "document": "first", "metadata": {}},
+            {"id": "b", "document": "second", "metadata": {}},
+            {"id": "c", "document": "third", "metadata": {}},
+        ]
+        hits = rerank_hits("question", candidates, 2, FakeReranker())
+
+        self.assertEqual([hit["id"] for hit in hits], ["b", "c"])
+        self.assertEqual([hit["rerank_score"] for hit in hits], [0.9, 0.4])
+        self.assertTrue(all(hit["via"] == "rerank" for hit in hits))
 
 
 class EvaluationScoringTest(unittest.TestCase):
