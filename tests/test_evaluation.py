@@ -3,7 +3,6 @@ import unittest
 from evaluate import (
     cited_article_pairs,
     rerank_hits,
-    resolve_methods,
     score_answer,
     score_retrieval,
 )
@@ -34,28 +33,7 @@ CASE = {
 }
 
 
-class WorkshopStageTest(unittest.TestCase):
-    def test_stages_accumulate_previous_rags(self) -> None:
-        self.assertEqual(resolve_methods("fixed", None), ("fixed-vector",))
-        self.assertEqual(
-            resolve_methods("semantic", None),
-            ("fixed-vector", "semantic-vector"),
-        )
-        self.assertEqual(
-            resolve_methods("rerank", None),
-            ("fixed-vector", "semantic-vector", "rerank"),
-        )
-        self.assertEqual(
-            resolve_methods("graph", None),
-            ("fixed-vector", "semantic-vector", "rerank", "graph"),
-        )
-
-    def test_explicit_methods_override_stage_and_use_canonical_order(self) -> None:
-        self.assertEqual(
-            resolve_methods("graph", ["graph", "semantic-vector"]),
-            ("semantic-vector", "graph"),
-        )
-
+class RerankHitsTest(unittest.TestCase):
     def test_reranker_reorders_candidates_and_keeps_budget(self) -> None:
         class FakeReranker:
             def score(self, question, documents):

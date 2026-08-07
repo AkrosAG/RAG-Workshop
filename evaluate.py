@@ -1,11 +1,10 @@
-"""Evaluate the cumulative RAG variants used throughout the workshop.
+"""Evaluate all four workshop RAG variants and write one comparison report.
 
-Examples:
-    poetry run python evaluate.py --stage fixed
-    poetry run python evaluate.py --stage semantic
-    poetry run python evaluate.py --stage rerank
-    poetry run python evaluate.py --stage graph
-    poetry run python evaluate.py --methods semantic-vector rerank
+Requires the ingested collections (rag-2a, rag-3a) and the retrieval graph
+(rag-4a). Every question is answered with fixed-vector, semantic-vector,
+rerank and graph retrieval.
+
+Run:  poetry run python evaluate.py
 """
 
 import argparse
@@ -27,14 +26,6 @@ from graph_retrieval import (
     vector_retrieve,
 )
 
-METHOD_ORDER = ("fixed-vector", "semantic-vector", "rerank", "graph")
-STAGE_METHODS = {
-    "fixed": ("fixed-vector",),
-    "semantic": ("fixed-vector", "semantic-vector"),
-    "rerank": ("fixed-vector", "semantic-vector", "rerank"),
-    "graph": METHOD_ORDER,
-}
-
 sys.excepthook = lambda exc_type, exc, _: sys.exit(f"{exc_type.__name__}: {exc}")
 
 # Redirected stdout on Windows defaults to cp1252; model output needs UTF-8.
@@ -52,12 +43,6 @@ CITATION_RE = re.compile(
 
 def normalized(text: str) -> str:
     return " ".join(text.casefold().split())
-
-
-def resolve_methods(stage: str, methods: list[str] | None) -> tuple[str, ...]:
-    """Resolve an accumulating workshop stage or an explicit method list."""
-    selected = methods if methods else list(STAGE_METHODS[stage])
-    return tuple(method for method in METHOD_ORDER if method in selected)
 
 
 class Reranker:
@@ -442,33 +427,27 @@ def render_report(
         )
 
     lines.extend(["", "## Strategic token perspective", ""])
-    if "semantic-vector" in method_order and "graph" in method_order:
-        vector_tokens = mean(
-            row["prompt_context_tokens"]
-            for row in rows
-            if row["method"] == "semantic-vector"
-        )
-        graph_tokens = mean(
-            row["prompt_context_tokens"]
-            for row in rows
-            if row["method"] == "graph"
-        )
-        delta = (graph_tokens - vector_tokens) / vector_tokens
-        lines.extend(
-            [
-                "All methods receive the same final chunk budget. Because chunking "
-                "and retrieval differ, their actual token counts can still differ.",
-                "",
-                f"In this run GraphRAG used **{delta:+.1%}** context tokens compared "
-                "with semantic Vector-RAG. Interpret this together with retrieval, "
-                "fact coverage and citation quality.",
-            ]
-        )
-    else:
-        lines.append(
-            "All selected methods receive the same final chunk budget. Their actual "
-            "token counts can differ because the retrieved chunks have different lengths."
-        )
+    vector_tokens = mean(
+        row["prompt_context_tokens"]
+        for row in rows
+        if row["method"] == "semantic-vector"
+    )
+    graph_tokens = mean(
+        row["prompt_context_tokens"]
+        for row in rows
+        if row["method"] == "graph"
+    )
+    delta = (graph_tokens - vector_tokens) / vector_tokens
+    lines.extend(
+        [
+            "All methods receive the same final chunk budget. Because chunking "
+            "and retrieval differ, their actual token counts can still differ.",
+            "",
+            f"In this run GraphRAG used **{delta:+.1%}** context tokens compared "
+            "with semantic Vector-RAG. Interpret this together with retrieval, "
+            "fact coverage and citation quality.",
+        ]
+    )
     lines.extend(["", "## Answer details", ""])
     cases_by_id = {case["id"]: case for case in cases}
     for row in rows:
@@ -493,28 +472,13 @@ def main() -> None:
 
     load_dotenv()
     parser = argparse.ArgumentParser(
-        description="Evaluate cumulative workshop RAG stages or selected methods."
+        description="Evaluate all four workshop RAG variants in one run."
     )
     parser.add_argument(
         "--questions", type=Path, default=ROOT / "evaluation" / "questions.json"
     )
     parser.add_argument(
-        "--output", type=Path, default=ROOT / "evaluation" / "report.md"
-    )
-    parser.add_argument(
-        "--stage",
-        choices=tuple(STAGE_METHODS),
-        default="graph",
-        help=(
-            "Cumulative workshop stage: fixed; semantic adds semantic-vector; "
-            "rerank adds the cross-encoder; graph adds GraphRAG (default: graph)."
-        ),
-    )
-    parser.add_argument(
-        "--methods",
-        nargs="+",
-        choices=METHOD_ORDER,
-        help="Explicit methods to run; overrides --stage.",
+        "--output", type=Path, default=ROOT / "evaluation" / "report-graph.md"
     )
     parser.add_argument(
         "--fixed-collection", default=os.getenv("RAG_FIXED_COLLECTION", "rag_fixed")
@@ -546,7 +510,6 @@ def main() -> None:
         help="Lexical article candidates merged into GraphRAG (default: 2).",
     )
     args = parser.parse_args()
-    selected_methods = resolve_methods(args.stage, args.methods)
     if args.context_k < 1:
         parser.error("--context-k must be at least 1")
     if not 1 <= args.graph_seed_k <= args.context_k:
@@ -564,52 +527,38 @@ def main() -> None:
     chat_model = os.getenv("LLM_MODEL", "llama3.2")
     collections: dict[str, Any] = {}
     definitions: dict[str, dict[str, list[str]]] = {}
-    if "fixed-vector" in selected_methods:
-        fixed = chromadb.PersistentClient(path=str(ROOT / ".chroma-2")).get_collection(
-            args.fixed_collection, embedding_function=None
-        )
-        collections["fixed"] = fixed
-        definitions["fixed"] = build_graph(fixed)["article_definitions"]
-
-    needs_semantic = any(
-        method in selected_methods for method in ("semantic-vector", "rerank", "graph")
+    fixed = chromadb.PersistentClient(path=str(ROOT / ".chroma-2")).get_collection(
+        args.fixed_collection, embedding_function=None
     )
-    graph: dict[str, Any] | None = None
-    article_index: list[dict[str, Any]] = []
-    if needs_semantic:
-        semantic = chromadb.PersistentClient(
-            path=str(ROOT / ".chroma-3")
-        ).get_collection(args.semantic_collection, embedding_function=None)
-        collections["semantic"] = semantic
-        if "graph" in selected_methods:
-            graph = load_graph(
-                ROOT / ".chroma-3" / f"{args.semantic_collection}_graph.json"
-            )
-            if graph.get("version") != GRAPH_VERSION:
-                sys.exit(
-                    "Graph format is outdated. Rebuild it with: "
-                    "poetry run python rag-4a-graph.py"
-                )
-        else:
-            graph = build_graph(semantic)
-        article_definitions = graph.get("article_definitions")
-        if not isinstance(article_definitions, dict):
-            sys.exit("Could not determine normalized article definitions.")
-        definitions["semantic"] = article_definitions
-        if "graph" in selected_methods:
-            article_index = build_article_index(semantic, graph)
+    collections["fixed"] = fixed
+    definitions["fixed"] = build_graph(fixed)["article_definitions"]
 
-    reranker = None
-    if "rerank" in selected_methods:
-        reranker = Reranker(
-            os.getenv("RERANK_MODEL", "BAAI/bge-reranker-v2-m3"),
-            os.getenv("RERANK_URL", ""),
-            os.getenv("LLM_API_KEY", ""),
+    semantic = chromadb.PersistentClient(
+        path=str(ROOT / ".chroma-3")
+    ).get_collection(args.semantic_collection, embedding_function=None)
+    collections["semantic"] = semantic
+    graph = load_graph(
+        ROOT / ".chroma-3" / f"{args.semantic_collection}_graph.json"
+    )
+    if graph.get("version") != GRAPH_VERSION:
+        sys.exit(
+            "Graph format is outdated. Rebuild it with: "
+            "poetry run python rag-4a-graph.py"
         )
+    article_definitions = graph.get("article_definitions")
+    if not isinstance(article_definitions, dict):
+        sys.exit("Could not determine normalized article definitions.")
+    definitions["semantic"] = article_definitions
+    article_index = build_article_index(semantic, graph)
+
+    reranker = Reranker(
+        os.getenv("RERANK_MODEL", "BAAI/bge-reranker-v2-m3"),
+        os.getenv("RERANK_URL", ""),
+        os.getenv("LLM_API_KEY", ""),
+    )
     cases = json.loads(args.questions.read_text(encoding="utf-8"))
 
-    corpus_collection = collections.get("semantic", collections.get("fixed"))
-    corpus = corpus_collection.get(include=["documents"])
+    corpus = semantic.get(include=["documents"])
     full_corpus_text = normalized("\n".join(corpus["documents"]))
     full_corpus_tokens = estimate_tokens(full_corpus_text)
     rows: list[dict[str, Any]] = []
@@ -618,25 +567,19 @@ def main() -> None:
         embedding = client.embeddings.create(
             model=embed_model, input=[case["question"]]
         ).data[0].embedding
-        methods: dict[str, list[dict[str, Any]]] = {}
-        if "fixed-vector" in selected_methods:
-            methods["fixed-vector"] = vector_retrieve(
-                collections["fixed"], embedding, args.context_k
-            )
-        if "semantic-vector" in selected_methods:
-            methods["semantic-vector"] = vector_retrieve(
-                collections["semantic"], embedding, args.context_k
-            )
-        if "rerank" in selected_methods:
-            candidates = vector_retrieve(
-                collections["semantic"], embedding, args.rerank_candidates
-            )
-            methods["rerank"] = rerank_hits(
+        candidates = vector_retrieve(
+            semantic, embedding, args.rerank_candidates
+        )
+        methods: dict[str, list[dict[str, Any]]] = {
+            "fixed-vector": vector_retrieve(fixed, embedding, args.context_k),
+            "semantic-vector": vector_retrieve(
+                semantic, embedding, args.context_k
+            ),
+            "rerank": rerank_hits(
                 case["question"], candidates, args.context_k, reranker
-            )
-        if "graph" in selected_methods:
-            methods["graph"] = graph_retrieve(
-                collection=collections["semantic"],
+            ),
+            "graph": graph_retrieve(
+                collection=semantic,
                 query_embedding=embedding,
                 graph=graph,
                 question=case["question"],
@@ -644,7 +587,8 @@ def main() -> None:
                 seed_limit=args.graph_seed_k,
                 article_limit=args.article_k,
                 context_limit=args.context_k,
-            )
+            ),
+        }
         for method, hits in methods.items():
             answer = answer_question(
                 client, chat_model, case["question"], hits

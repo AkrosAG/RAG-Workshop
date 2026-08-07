@@ -357,12 +357,9 @@ wie viele Vektor-Treffer und Chunks insgesamt in den Kontext gelangen.
 Nach Änderungen an der Artikelerkennung muss `rag-4a-graph.py` erneut
 ausgeführt werden; Chat und Evaluation lehnen veraltete Graphformate ab.
 
-## Kumulative Workshop-Evaluation
+## Workshop-Evaluation
 
-`evaluation/questions.json` enthält die Fragen aus `samples.md` mit erwarteten
-Quellen, Artikeln, Referenzantworten und atomaren Pflichtfakten. `evaluate.py`
-lässt die für eine Workshop-Stufe verfügbaren RAG-Varianten mit demselben
-Chat-Modell antworten und vergleicht:
+`evaluation/questions.json` enthält Referenzfragen mit erwarteten Quellen, Artikeln, Referenzantworten und atomaren Pflichtfakten. `evaluate.py` lässt alle vier RAG-Varianten (`fixed-vector`, `semantic-vector`, `rerank`, `graph`) mit demselben Chat-Modell antworten und vergleicht:
 
 - Quellen-Recall, Article Hit@K, Article Recall@K und Article MRR,
 - Faktenabdeckung der generierten Antwort; zusammengesetzte Fakten können
@@ -376,40 +373,12 @@ Chat-Modell antworten und vergleicht:
 - Tokenersparnis gegenüber dem vollständigen Korpus.
 
 ```bash
-# Stufe 2: nur Fixed-Size-Vector-RAG
-poetry run python evaluate.py --stage fixed
-
-# Stufe 3a/3b: Fixed-Size plus strukturorientiertes Chunking
-poetry run python evaluate.py --stage semantic
-
-# Stufe 3c: zusätzlich Cross-Encoder-Reranking
-poetry run python evaluate.py --stage rerank
-
-# Stufe 4: zusätzlich hybrides GraphRAG (Standard)
-poetry run python evaluate.py --stage graph
+poetry run python evaluate.py
 ```
 
-Die Stufen sind kumulativ: Jede neue Stufe führt auch alle bisherigen RAGs aus.
-Für gezielte Versuche überschreibt `--methods` die Stufenauswahl:
+Voraussetzung sind die beiden Collections `.chroma-2/rag_fixed` (rag-2a) und `.chroma-3/rag_semantic` (rag-3a) sowie der Retrieval-Graph aus `rag-4a-graph.py`. Die Collection-Namen lassen sich mit `--fixed-collection` und `--semantic-collection` (Alias `--collection`) ändern. `--rerank-candidates` steuert, wie viele semantische Treffer der Cross-Encoder bewertet; standardmässig sind es zehn.
 
-```bash
-poetry run python evaluate.py --methods semantic-vector rerank
-```
-
-Verfügbare Methoden sind `fixed-vector`, `semantic-vector`, `rerank` und
-`graph`. Für `fixed-vector` muss `.chroma-2/rag_fixed`, für die übrigen Methoden
-`.chroma-3/rag_semantic` vorhanden sein. Die Namen lassen sich mit
-`--fixed-collection` und `--semantic-collection` beziehungsweise dem bisherigen
-Alias `--collection` ändern. `--rerank-candidates` steuert, wie viele semantische
-Treffer der Cross-Encoder bewertet; standardmässig sind es zehn.
-
-Der generierte Bericht landet unter `evaluation/report.md` und wird nicht
-versioniert. Die Tokenzahl wird näherungsweise als `Zeichen / 4` berechnet.
-Das ist keine Abrechnungsmetrik, eignet sich aber für den relativen Vergleich.
-Pro Referenzfrage wird je ausgewählter Methode eine Chat-Anfrage ausgeführt.
-Die Bewertung selbst ist deterministisch und verwendet keinen zusätzlichen
-LLM-Judge. `Term Coverage` wird ausdrücklich nicht als Antwortqualität
-interpretiert.
+Der Bericht landet unter `evaluation/report-graph.md` und stellt alle vier Varianten nebeneinander. Die Tokenzahl wird näherungsweise als `Zeichen / 4` berechnet. Das ist keine Abrechnungsmetrik, eignet sich aber für den relativen Vergleich. Pro Referenzfrage wird je Methode eine Chat-Anfrage ausgeführt. Die Bewertung selbst ist deterministisch und verwendet keinen zusätzlichen LLM-Judge. `Term Coverage` wird ausdrücklich nicht als Antwortqualität interpretiert.
 
 `Expected-citation precision` prüft, ob die genannten Quellen-/Artikelpaare
 zur Referenzfrage gehören. `Citation grounding` prüft zusätzlich, ob diese
