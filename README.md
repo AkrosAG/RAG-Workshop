@@ -229,6 +229,64 @@ Der Stage-3-Index liegt unter `.chroma-3`; die Collection heisst trotz der
 neuen Chunking-Strategie weiterhin `rag_semantic`. Die Metadaten jedes Chunks
 enthalten zusätzlich `chunk_strategy=legal-article-v1`.
 
+### Chunk-Grenzen direkt in der Chroma-SQLite prüfen
+
+Ergänzend zum `--dry-run` lässt sich die Integrität des semantischen Chunkings direkt in der Datenbank kontrollieren: Die folgende Abfrage rekonstruiert pro Quelle die Chunk-Reihenfolge und stellt jedem Chunk den Anfang seines Nachfolgers (`next_document`) gegenüber — so sieht man auf einen Blick, ob eine Chunk-Grenze mitten durch einen Artikel oder eine Aufzählung schneidet. Ausführen z.B. mit dem `sqlite3`-CLI oder einem DB-Browser auf `.chroma-3/chroma.sqlite3`; der `source`-Filter in der letzten `WHERE`-Klausel lässt sich auf jede andere Quelldatei anpassen.
+
+```sql
+WITH chunks AS (
+    SELECT
+        e.embedding_id AS chunk_id,
+        MAX(
+            CASE
+                WHEN m.key = 'source'
+                THEN m.string_value
+            END
+        ) AS source,
+        MAX(
+            CASE
+                WHEN m.key = 'chroma:document'
+                THEN m.string_value
+            END
+        ) AS document,
+        CAST(
+            substr(
+                e.embedding_id,
+                instr(e.embedding_id, '::') + 2
+            ) AS INTEGER
+        ) AS chunk_no
+    FROM embeddings e
+    JOIN segments s
+        ON s.id = e.segment_id
+    JOIN collections c
+        ON c.id = s.collection
+    JOIN embedding_metadata m
+        ON m.id = e.id
+    WHERE c.name = 'rag_semantic'
+    GROUP BY e.id, e.embedding_id
+),
+boundaries AS (
+    SELECT
+        *,
+        lead(document) OVER (
+            PARTITION BY source
+            ORDER BY chunk_no
+        ) AS next_document
+    FROM chunks
+)
+SELECT
+    chunk_id,
+    source,
+    chunk_no,
+    length(document) AS chunk_length,
+    document,
+    next_document
+FROM boundaries
+WHERE source = 'SR_101_BV_de.md'
+  AND next_document IS NOT NULL
+ORDER BY chunk_no;
+```
+
 `rag-3b-chat-classical.py` fragt diesen Index weiterhin nur mit klassischer
 Vektorsuche ab und verwendet die vier ähnlichsten Chunks direkt als Kontext.
 Das Legal-Chunking verbessert die Artikelgrenzen, garantiert bei kurzen,
