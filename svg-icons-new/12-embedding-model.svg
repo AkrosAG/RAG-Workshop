@@ -1,1 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect x="4.5" y="4.5" width="247" height="247" rx="24" fill="#FFF6E3" stroke="#3E3348" stroke-width="9"/><path d="M36 70h62l18 18v84H36z" fill="#fff" stroke="#3E3348" stroke-width="9" stroke-linejoin="round"/><path d="M98 70v18h18z" fill="#FFE08A" stroke="#3E3348" stroke-width="9" stroke-linejoin="round"/><g stroke-linecap="round" stroke-width="8" fill="none"><path d="M52 100h24" stroke="#EC6157"/><path d="M52 122h34" stroke="#7EB1E8"/><path d="M52 144h28" stroke="#7EB1E8"/></g><path d="M128 128h32m0 0-12-14m12 14-12 14" fill="none" stroke="#3E3348" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M186 64h-12v128h12" fill="none" stroke="#3E3348" stroke-width="8" stroke-linecap="round"/><path d="M232 64h12v128h-12" fill="none" stroke="#3E3348" stroke-width="8" stroke-linecap="round"/><circle cx="209" cy="92" r="13" fill="#8F7FDB" stroke="#3E3348" stroke-width="7"/><circle cx="209" cy="128" r="13" fill="#F7C74D" stroke="#3E3348" stroke-width="7"/><circle cx="209" cy="164" r="13" fill="#9FD46C" stroke="#3E3348" stroke-width="7"/><path d="M46 44v-14M39 37h14" stroke="#F7C74D" stroke-width="7" stroke-linecap="round"/><path d="M130 216v-12M124 210h12" stroke="#EC6157" stroke-width="6" stroke-linecap="round"/></svg>
+<svg width="256" height="256" xmlns="http://www.w3.org/2000/svg">
+
+ <g>
+  <title>background</title>
+  <rect fill="none" id="canvas_background" height="602" width="802" y="-1" x="-1"/>
+ </g>
+ <g>
+  <title>Layer 1</title>
+  <rect id="svg_1" stroke-width="9" stroke="#3E3348" fill="#FFF6E3" rx="24" height="247" width="247" y="4.5" x="4.5"/>
+  <path id="svg_2" stroke-linejoin="round" stroke-width="9" stroke="#3E3348" fill="#fff" d="m36,70l62,0l18,18l0,84l-80,0l0,-102z"/>
+  <path id="svg_3" stroke-linejoin="round" stroke-width="9" stroke="#3E3348" fill="#FFE08A" d="m98,70l0,18l18,0l-18,-18z"/>
+  <g id="svg_4" fill="none" stroke-width="8" stroke-linecap="round">
+   <path id="svg_5" stroke="#EC6157" d="m52,100l24,0"/>
+   <path id="svg_6" stroke="#7EB1E8" d="m52,122l34,0"/>
+   <path id="svg_7" stroke="#7EB1E8" d="m52,144l28,0"/>
+  </g>
+  <path id="svg_8" stroke-linejoin="round" stroke-linecap="round" stroke-width="9" stroke="#3E3348" fill="none" d="m128,128l32,0m0,0l-12,-14m12,14l-12,14"/>
+  <path id="svg_9" stroke-linecap="round" stroke-width="8" stroke="#3E3348" fill="none" d="m186,64l-12,0l0,128l12,0"/>
+  <path id="svg_10" stroke-linecap="round" stroke-width="8" stroke="#3E3348" fill="none" d="m212.73058,64l12,0l0,128l-12,0"/>
+  <circle id="svg_11" stroke-width="7" stroke="#3E3348" fill="#8F7FDB" r="13" cy="92" cx="198.950125"/>
+  <circle id="svg_12" stroke-width="7" stroke="#3E3348" fill="#F7C74D" r="13" cy="128" cx="198.950125"/>
+  <circle id="svg_13" stroke-width="7" stroke="#3E3348" fill="#9FD46C" r="13" cy="164" cx="198.950125"/>
+  <path id="svg_14" stroke-linecap="round" stroke-width="7" stroke="#F7C74D" d="m46,44l0,-14m-7,7l14,0"/>
+  <path id="svg_15" stroke-linecap="round" stroke-width="6" stroke="#EC6157" d="m130,216l0,-12m-6,6l12,0"/>
+ </g>
+</svg>

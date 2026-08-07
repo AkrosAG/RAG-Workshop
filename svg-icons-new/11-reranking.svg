@@ -1,1 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect x="4.5" y="4.5" width="247" height="247" rx="24" fill="#FFF6E3" stroke="#3E3348" stroke-width="9"/><rect x="88" y="44" width="124" height="42" rx="10" fill="#F7C74D" stroke="#3E3348" stroke-width="9"/><rect x="88" y="107" width="124" height="42" rx="10" fill="#7EB1E8" stroke="#3E3348" stroke-width="9"/><rect x="88" y="170" width="124" height="42" rx="10" fill="#9FD46C" stroke="#3E3348" stroke-width="9"/><g stroke="#fff" stroke-width="8" stroke-linecap="round" fill="none"><path d="M106 65h64M106 128h48M106 191h56"/></g><path d="M40 108 60 78 80 108H68v88H52v-88z" fill="#EC6157" stroke="#3E3348" stroke-width="7" stroke-linejoin="round"/><path d="M36 226v-12M30 220h12" stroke="#F7C74D" stroke-width="6" stroke-linecap="round"/><path d="M228 30v-12M222 24h12" stroke="#8F7FDB" stroke-width="6" stroke-linecap="round"/></svg>
+<svg width="256" height="256" xmlns="http://www.w3.org/2000/svg">
+
+ <g>
+  <title>background</title>
+  <rect fill="none" id="canvas_background" height="602" width="802" y="-1" x="-1"/>
+ </g>
+ <g>
+  <title>Layer 1</title>
+  <rect id="svg_1" stroke-width="9" stroke="#3E3348" fill="#FFF6E3" rx="24" height="247" width="247" y="4.5" x="4.5"/>
+  <rect id="svg_2" stroke-width="9" stroke="#3E3348" fill="#F7C74D" rx="10" height="42" width="124" y="44" x="88"/>
+  <rect id="svg_3" stroke-width="9" stroke="#3E3348" fill="#7EB1E8" rx="10" height="42" width="124" y="107" x="88"/>
+  <rect id="svg_4" stroke-width="9" stroke="#3E3348" fill="#9FD46C" rx="10" height="42" width="124" y="170" x="88"/>
+  <g id="svg_5" fill="none" stroke-linecap="round" stroke-width="8" stroke="#fff">
+   <path id="svg_6" d="m106,65l64,0m-64,63l48,0m-48,63l56,0"/>
+  </g>
+  <path stroke="#3E3348" id="svg_7" stroke-linejoin="round" stroke-width="7" fill="#EC6157" d="m40,87.711862l20,-42.711867l20,42.711867l-12,0l0,125.288142l-16,0l0,-125.288142l-12,0z"/>
+  <path id="svg_8" stroke-linecap="round" stroke-width="6" stroke="#F7C74D" d="m36,226l0,-12m-6,6l12,0"/>
+  <path id="svg_9" stroke-linecap="round" stroke-width="6" stroke="#8F7FDB" d="m228,30l0,-12m-6,6l12,0"/>
+ </g>
+</svg>
