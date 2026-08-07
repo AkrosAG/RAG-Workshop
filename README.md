@@ -100,6 +100,12 @@ poetry run python rag-2b-chat.py "Wie hoch ist der reduzierte Mehrwertsteuersatz
 poetry run python rag-2b-chat.py "Wie lange dauert die Probezeit im Arbeitsverhältnis?"
 ```
 
+**Funktioniert nicht mehr, ohne dass man es sieht** — unsichtbar unvollständige Aufzählungen. Der Fixed-Size-Schnitt trennt die Ausnahmeliste von Art. 198 ZPO direkt nach der Einleitung "Das Schlichtungsverfahren entfällt:"; die Vektorsuche erwischt nur den Chunk mit dem Listen-Ende. Die Antwort nennt darum nur die Buchstaben f–i (einzige kantonale Instanz, Widerklage, Bundespatentgericht, …) und unterschlägt a–e (summarisches Verfahren, Personenstand, Scheidung, SchKG-Klagen, …) — sie klingt vollständig, zitiert korrekt Art. 198/199 und ist trotzdem nur die halbe Liste. Nur wer das Gesetz kennt, merkt es; 3b liefert auf dieselbe Frage die komplette Aufzählung, weil Art. 198 dort als zusammenhängender Chunk im Index liegt:
+
+```bash
+poetry run python rag-2b-chat.py "In welchen Fällen entfällt das Schlichtungsverfahren?"
+```
+
 ### Reranking
 
 ```bash
