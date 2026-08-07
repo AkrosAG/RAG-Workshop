@@ -291,8 +291,8 @@ poetry run python rag-4b-chat.py \
 ```
 
 `rag-2a-ingest.py` und `rag-2b-chat.py` sind eine eigenständige didaktische
-Stufe für Fixed-Size-Chunking. Sie sind weder Voraussetzung für GraphRAG noch
-Teil der Vector-RAG-vs.-GraphRAG-Evaluation.
+Stufe für Fixed-Size-Chunking. Sie sind keine Voraussetzung für GraphRAG, werden
+in der kumulativen Workshop-Evaluation aber als Ausgangsbasis mitgeführt.
 
 Der Graph wird lokal unter `.chroma-3/rag_semantic_graph.json` gespeichert und
 nicht versioniert. Mit `GRAPH_SEED_K` und `GRAPH_CONTEXT_K` lässt sich steuern,
@@ -302,11 +302,12 @@ wie viele Vektor-Treffer und Chunks insgesamt in den Kontext gelangen.
 Nach Änderungen an der Artikelerkennung muss `rag-4a-graph.py` erneut
 ausgeführt werden; Chat und Evaluation lehnen veraltete Graphformate ab.
 
-## Evaluation: Vector-RAG vs. GraphRAG
+## Kumulative Workshop-Evaluation
 
-`evaluation/questions.json` enthält Referenzfragen mit erwarteten Quellen,
-Artikeln, Referenzantworten und atomaren Pflichtfakten. `evaluate.py` lässt
-beide Retrieval-Varianten mit demselben Chat-Modell antworten und vergleicht:
+`evaluation/questions.json` enthält die Fragen aus `samples.md` mit erwarteten
+Quellen, Artikeln, Referenzantworten und atomaren Pflichtfakten. `evaluate.py`
+lässt die für eine Workshop-Stufe verfügbaren RAG-Varianten mit demselben
+Chat-Modell antworten und vergleicht:
 
 - Quellen-Recall, Article Hit@K, Article Recall@K und Article MRR,
 - Faktenabdeckung der generierten Antwort; zusammengesetzte Fakten können
@@ -320,16 +321,40 @@ beide Retrieval-Varianten mit demselben Chat-Modell antworten und vergleicht:
 - Tokenersparnis gegenüber dem vollständigen Korpus.
 
 ```bash
-poetry run python evaluate.py
+# Stufe 2: nur Fixed-Size-Vector-RAG
+poetry run python evaluate.py --stage fixed
+
+# Stufe 3a/3b: Fixed-Size plus strukturorientiertes Chunking
+poetry run python evaluate.py --stage semantic
+
+# Stufe 3c: zusätzlich Cross-Encoder-Reranking
+poetry run python evaluate.py --stage rerank
+
+# Stufe 4: zusätzlich hybrides GraphRAG (Standard)
+poetry run python evaluate.py --stage graph
 ```
+
+Die Stufen sind kumulativ: Jede neue Stufe führt auch alle bisherigen RAGs aus.
+Für gezielte Versuche überschreibt `--methods` die Stufenauswahl:
+
+```bash
+poetry run python evaluate.py --methods semantic-vector rerank
+```
+
+Verfügbare Methoden sind `fixed-vector`, `semantic-vector`, `rerank` und
+`graph`. Für `fixed-vector` muss `.chroma-2/rag_fixed`, für die übrigen Methoden
+`.chroma-3/rag_semantic` vorhanden sein. Die Namen lassen sich mit
+`--fixed-collection` und `--semantic-collection` beziehungsweise dem bisherigen
+Alias `--collection` ändern. `--rerank-candidates` steuert, wie viele semantische
+Treffer der Cross-Encoder bewertet; standardmässig sind es zehn.
 
 Der generierte Bericht landet unter `evaluation/report.md` und wird nicht
 versioniert. Die Tokenzahl wird näherungsweise als `Zeichen / 4` berechnet.
 Das ist keine Abrechnungsmetrik, eignet sich aber für den relativen Vergleich.
-Pro Referenzfrage werden zwei Chat-Anfragen ausgeführt: eine für Vector-RAG
-und eine für GraphRAG. Die Bewertung selbst ist deterministisch und verwendet
-keinen zusätzlichen LLM-Judge. `Term Coverage` wird ausdrücklich nicht als
-Antwortqualität interpretiert.
+Pro Referenzfrage wird je ausgewählter Methode eine Chat-Anfrage ausgeführt.
+Die Bewertung selbst ist deterministisch und verwendet keinen zusätzlichen
+LLM-Judge. `Term Coverage` wird ausdrücklich nicht als Antwortqualität
+interpretiert.
 
 `Expected-citation precision` prüft, ob die genannten Quellen-/Artikelpaare
 zur Referenzfrage gehören. `Citation grounding` prüft zusätzlich, ob diese
@@ -340,9 +365,9 @@ Zusätze wie `Abs. 1`, `lit. a`, `Ziff. 2` oder Fussnoten dürfen im Zitat stehe
 für die Metriken wird der jeweilige Basisartikel ausgewertet.
 
 Die strategische Perspektive ist Teil des Reports: RAG spart Tokens gegenüber
-dem vollständigen Kontext. Vector-RAG und GraphRAG verwenden standardmässig
-dasselbe Budget von sechs Chunks (`--context-k`), damit der Vergleich fair
-bleibt. `--graph-seed-k` bestimmt, wie viele davon zunächst über die
+dem vollständigen Kontext. Alle Methoden verwenden standardmässig dasselbe
+finale Budget von sechs Chunks (`--context-k`), damit der Vergleich fair bleibt.
+`--graph-seed-k` bestimmt, wie viele GraphRAG-Kandidaten zunächst über die
 Vektorsuche gewählt werden.
 
 Die Stage-3-Chats verwenden standardmässig den von `rag-3a-ingest.py`
