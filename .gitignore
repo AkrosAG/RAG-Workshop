@@ -1,5 +1,4 @@
 # Local secrets and state
-.env
 .chroma/
 .chroma-legal/
 .chroma-3/*_graph.json

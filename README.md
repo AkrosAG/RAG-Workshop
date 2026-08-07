@@ -40,16 +40,10 @@ entfernt und ein unveränderter zweiter Lauf tut nichts.
 
 ### Schnellstart (Hands-on: Vom Setup zur ersten belegbaren Antwort)
 
-Voraussetzung: Python ≥ 3.10, [Poetry](https://python-poetry.org/), eine
-Verbindung zum AKROS-VPN und ein Marvin-API-Key mit Zugriff auf die
-konfigurierten Chat- und Embedding-Modelle.
+Voraussetzung: Python ≥ 3.10, [Poetry](https://python-poetry.org/) und eine Verbindung zum AKROS-VPN. Die Konfiguration inklusive temporärem Workshop-API-Key liegt in `.env` bereit — kein weiteres Setup nötig.
 
 ```bash
 poetry install
-cp .env.example .env          # Windows: copy .env.example .env
-# danach den Key für die aktuelle Shell setzen:
-# PowerShell: .\set-key.ps1
-# Bash: source ./set-key.sh
 ```
 
 Ohne Poetry geht es auch mit einem klassischen venv + `requirements.txt`:
@@ -58,7 +52,6 @@ Ohne Poetry geht es auch mit einem klassischen venv + `requirements.txt`:
 python -m venv .venv
 source .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env
 ```
 
 Dann die Stufen der Reihe nach (mit venv statt Poetry: `python ...` direkt):
@@ -442,27 +435,11 @@ RAG_COLLECTION=rag_semantic poetry run python rag-3b-chat-classical.py "..."
 RAG_COLLECTION=rag_semantic poetry run python rag-3c-chat-rerank.py "..."
 ```
 
-## Endpoint wählen (`.env`) — Key bleibt ausserhalb
+## Endpoint wählen (`.env`)
 
-`.env` enthält nur **Nicht-Geheimes**: `LLM_BASE_URL`, `LLM_MODEL`,
-`EMBED_MODEL` und `RERANK_MODEL` (siehe `.env.example`). Konfiguriert ist
-Marvin; der Endpoint ist nur über das AKROS-VPN erreichbar und benötigt einen
-passenden API-Key. Der Re-Ranker läuft lokal.
+`.env` konfiguriert Endpoint, Modelle und Key: `LLM_BASE_URL`, `LLM_MODEL`, `EMBED_MODEL`, `RERANK_MODEL` und `LLM_API_KEY`. Die Datei ist mit dem Workshop-Setup im Repository enthalten; `.env.example` dient als dokumentierte Referenz. Konfiguriert ist Marvin; der Endpoint ist nur über das AKROS-VPN erreichbar. Der Re-Ranker läuft lokal.
 
-Der **API-Key wird nie in eine Datei geschrieben**. Für einen Endpoint mit Key
-(z. B. einen internen LiteLLM-Proxy) setzt du ihn einmal pro Shell-Session:
-
-```powershell
-.\set-key.ps1                 # PowerShell — fragt verdeckt ab, gilt für die Session
-```
-
-```bash
-source set-key.sh             # bash/zsh — MUSS gesourced werden
-```
-
-Danach erben alle `python`/`poetry`-Aufrufe aus dieser Shell den Key; beim
-Schliessen der Shell ist er weg. `python-dotenv` überschreibt gesetzte
-Umgebungsvariablen nicht — der Session-Key gewinnt also immer.
+Der hinterlegte `LLM_API_KEY` ist ein gemeinsamer, **temporärer Workshop-Key** und wird nach dem Workshop deaktiviert; für alles darüber hinaus braucht es einen persönlichen Marvin-Key. Ein bereits in der Shell gesetzter `LLM_API_KEY` hat Vorrang — `python-dotenv` überschreibt gesetzte Umgebungsvariablen nicht.
 
 ## Projektstruktur
 
