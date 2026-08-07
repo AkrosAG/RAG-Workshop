@@ -13,9 +13,9 @@ Approach:
 Python standard library only, no dependencies.
 
 Usage:
-    python3 fedlex_download.py                 # German, ./fedlex_pdfs
-    python3 fedlex_download.py --lang fr       # French
-    python3 fedlex_download.py --outdir /path  # different target directory
+    python data/fedlex_download.py                 # German, data/fedlex_pdfs
+    python data/fedlex_download.py --lang fr       # French
+    python data/fedlex_download.py --outdir /path  # different target directory
 
 Legal note: reuse of the Fedlex texts is explicitly permitted, see
 https://www.fedlex.admin.ch/de/broadcasters.
@@ -131,8 +131,9 @@ def main():
     parser = argparse.ArgumentParser(description="Download core Swiss federal acts as PDFs from Fedlex")
     parser.add_argument("--lang", default="de", choices=sorted(LANG_URI),
                         help="Language of the acts (default: de)")
-    parser.add_argument("--outdir", default="fedlex_pdfs",
-                        help="Target directory (default: ./fedlex_pdfs)")
+    parser.add_argument("--outdir",
+                        default=str(Path(__file__).resolve().parent / "fedlex_pdfs"),
+                        help="Target directory (default: fedlex_pdfs next to this script)")
     parser.add_argument("--delay", type=float, default=1.0,
                         help="Pause in seconds between downloads (default: 1.0)")
     args = parser.parse_args()

@@ -17,5 +17,5 @@ uv.lock
 .vscode/
 .idea/
 
-data/SR_*.md
+data/fedlex_mds/
 evaluation/report.md

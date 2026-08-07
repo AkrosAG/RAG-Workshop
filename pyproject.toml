@@ -12,12 +12,5 @@ dependencies = [
     "sentence-transformers>=5.0",
 ]
 
-[dependency-groups]
-# Didactic layer for Block 1 — installed in the container, optional locally.
-notebook = [
-    "jupyterlab>=4.0",
-    "ipykernel>=6.0",
-]
-
 [tool.poetry]
 package-mode = false

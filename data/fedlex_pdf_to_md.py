@@ -6,8 +6,8 @@ contains a metadata header and one section per PDF page so retrieved text can
 be traced back to the source page.
 
 Usage:
-    python scripts/fedlex_pdf_to_md.py
-    python scripts/fedlex_pdf_to_md.py --input-dir path/to/pdfs --output-dir data
+    python data/fedlex_pdf_to_md.py
+    python data/fedlex_pdf_to_md.py --input-dir path/to/pdfs --output-dir data/fedlex_mds
 """
 
 import argparse
@@ -19,9 +19,9 @@ from pathlib import Path
 from pypdf import PdfReader
 
 
-ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_INPUT = ROOT / "scripts" / "fedlex_pdfs"
-DEFAULT_OUTPUT = ROOT / "data"
+DATA = Path(__file__).resolve().parent
+DEFAULT_INPUT = DATA / "fedlex_pdfs"
+DEFAULT_OUTPUT = DATA / "fedlex_mds"
 
 
 def document_metadata(path: Path) -> tuple[str, str, str]:

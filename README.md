@@ -93,7 +93,7 @@ poetry run python rag-2b-chat.py "Wie hoch ist der reduzierte Mehrwertsteuersatz
 poetry run python rag-2b-chat.py "Wie lange dauert die Probezeit im Arbeitsverhältnis?"
 ```
 
-**Funktioniert nicht mehr, ohne dass man es sieht** — unsichtbar unvollständige Aufzählungen. Der Fixed-Size-Schnitt trennt die Ausnahmeliste von Art. 198 ZPO direkt nach der Einleitung "Das Schlichtungsverfahren entfällt:"; die Vektorsuche erwischt nur den Chunk mit dem Listen-Ende. Die Antwort nennt darum nur die Buchstaben f–i (einzige kantonale Instanz, Widerklage, Bundespatentgericht, …) und unterschlägt a–e (summarisches Verfahren, Personenstand, Scheidung, SchKG-Klagen, …) — sie klingt vollständig, zitiert korrekt Art. 198/199 und ist trotzdem nur die halbe Liste. Nur wer das Gesetz kennt, merkt es; 3b liefert auf dieselbe Frage die komplette Aufzählung, weil Art. 198 dort als zusammenhängender Chunk im Index liegt:
+Unsichtbar unvollständige Aufzählungen. Der Fixed-Size-Schnitt trennt die Ausnahmeliste von Art. 198 ZPO direkt nach der Einleitung "Das Schlichtungsverfahren entfällt:"; die Vektorsuche erwischt nur den Chunk mit dem Listen-Ende. Die Antwort nennt darum nur die Buchstaben f–i (einzige kantonale Instanz, Widerklage, Bundespatentgericht, …) und unterschlägt a–e (summarisches Verfahren, Personenstand, Scheidung, SchKG-Klagen, …) — sie klingt vollständig, zitiert korrekt Art. 198/199 und ist trotzdem nur die halbe Liste. Nur wer das Gesetz kennt, merkt es; 3b liefert auf dieselbe Frage die komplette Aufzählung, weil Art. 198 dort als zusammenhängender Chunk im Index liegt, und in 2b ein Teil verlorengeht:
 
 ```bash
 poetry run python rag-2b-chat.py "In welchen Fällen entfällt das Schlichtungsverfahren?"
@@ -158,23 +158,21 @@ Solche Fragen brauchen andere Werkzeuge (Korpus-Statistik, agentische Ansätze) 
 
 Die Schweizer Gesetzestexte werden reproduzierbar aus Fedlex aufgebaut:
 
-1. `fedlex_download.py` lädt die aktuell anwendbaren Fassungen als PDF nach
-   `scripts/fedlex_pdfs/`.
-2. `fedlex_pdf_to_md.py` extrahiert und bereinigt den Text und erzeugt
-   `data/SR_*.md`.
+1. `data/fedlex_download.py` lädt die aktuell anwendbaren Fassungen als PDF nach
+   `data/fedlex_pdfs/`.
+2. `data/fedlex_pdf_to_md.py` extrahiert und bereinigt den Text und erzeugt
+   `data/fedlex_mds/SR_*.md`.
 3. Die Ingest-Skripte chunken diese Markdown-Dateien und schreiben die
    Embeddings nach ChromaDB.
 
-Die heruntergeladenen PDFs, die daraus erzeugten Markdown-Dateien und die
-lokale ChromaDB werden bewusst **nicht in Git versioniert**. Sie bleiben lokal
-erhalten und können mit den folgenden Befehlen jederzeit neu erzeugt werden.
+Die PDFs sind als Quelle im Repository versioniert; die daraus erzeugten Markdown-Dateien unter `data/fedlex_mds/` bleiben unversioniert und lassen sich mit den folgenden Befehlen jederzeit neu erzeugen.
 
 Kompletter Ablauf mit Poetry für die Demonstration von Fixed-Size-Chunking:
 
 ```bash
 poetry install
-poetry run python scripts/fedlex_download.py --outdir scripts/fedlex_pdfs
-poetry run python scripts/fedlex_pdf_to_md.py
+poetry run python data/fedlex_download.py
+poetry run python data/fedlex_pdf_to_md.py
 poetry run python rag-2a-ingest.py
 ```
 
@@ -182,14 +180,14 @@ Mit einem klassischen `.venv` für dieselbe Fixed-Size-Demonstration:
 
 ```bash
 python -m pip install -r requirements.txt
-python scripts/fedlex_download.py --outdir scripts/fedlex_pdfs
-python scripts/fedlex_pdf_to_md.py
+python data/fedlex_download.py
+python data/fedlex_pdf_to_md.py
 python rag-2a-ingest.py
 ```
 
 Der Konverter lässt die Original-PDFs unverändert, bereinigt typische
 PDF-Zeilentrennungen und ergänzt Seitenmarker. Danach finden `rag-2a-ingest.py`
-und `rag-3a-ingest.py` die erzeugten `data/SR_*.md` automatisch. Stage 3
+und `rag-3a-ingest.py` die erzeugten `data/fedlex_mds/SR_*.md` automatisch. Stage 3
 entfernt die Seitenmarker beim Chunking wieder, damit sie nicht im
 Retrieval-Kontext landen.
 
@@ -304,7 +302,7 @@ Workshop-Skripte selbst; CPU-Inferenz funktioniert, eine unterstützte GPU
 beschleunigt das Re-Ranking. Über `RERANK_MODEL` kann ein anderes kompatibles
 Cross-Encoder-Modell gewählt werden.
 
-Alternativ kann das Re-Ranking über einen Jina-kompatiblen Remote-Endpoint laufen: `RERANK_URL` auf den Endpoint setzen und `RERANK_MODEL` auf das dortige Modell (siehe `.env.example`, für Marvin: `NexaAI/jina-v2-rerank-mlx`). Damit entfallen Modell-Download und lokale Inferenz; dafür braucht der virtuelle Key Zugriff auf das Rerank-Modell.
+Alternativ kann das Re-Ranking über einen Jina-kompatiblen Remote-Endpoint laufen: `RERANK_URL` auf den Endpoint setzen und `RERANK_MODEL` auf das dortige Modell (siehe `.env`, für Marvin: `NexaAI/jina-v2-rerank-mlx`). Damit entfallen Modell-Download und lokale Inferenz; dafür braucht der virtuelle Key Zugriff auf das Rerank-Modell.
 
 Für eine Workshopumgebung ohne verlässlichen Internetzugang sollte der
 Modell-Cache vorab gefüllt werden. Auf jedem Workshop-Rechner einmal ausführen:
@@ -437,30 +435,24 @@ RAG_COLLECTION=rag_semantic poetry run python rag-3c-chat-rerank.py "..."
 
 ## Endpoint wählen (`.env`)
 
-`.env` konfiguriert Endpoint, Modelle und Key: `LLM_BASE_URL`, `LLM_MODEL`, `EMBED_MODEL`, `RERANK_MODEL` und `LLM_API_KEY`. Die Datei ist mit dem Workshop-Setup im Repository enthalten; `.env.example` dient als dokumentierte Referenz. Konfiguriert ist Marvin; der Endpoint ist nur über das AKROS-VPN erreichbar. Der Re-Ranker läuft lokal.
+`.env` konfiguriert Endpoint, Modelle und Key: `LLM_BASE_URL`, `LLM_MODEL`, `EMBED_MODEL`, `RERANK_MODEL` und `LLM_API_KEY`. Die Datei ist mit dem Workshop-Setup im Repository enthalten und dokumentiert die Optionen in den Kommentaren. Konfiguriert ist Marvin; der Endpoint ist nur über das AKROS-VPN erreichbar. Der Re-Ranker läuft lokal.
 
 Der hinterlegte `LLM_API_KEY` ist ein gemeinsamer, **temporärer Workshop-Key** und wird nach dem Workshop deaktiviert; für alles darüber hinaus braucht es einen persönlichen Marvin-Key. Ein bereits in der Shell gesetzter `LLM_API_KEY` hat Vorrang — `python-dotenv` überschreibt gesetzte Umgebungsvariablen nicht.
 
 ## Projektstruktur
 
-```
+```text
 rag-demo/
-├── data/                     # neutraler Beispiel-Datensatz (3 Markdown-Dokumente)
-├── notebooks/
-│   └── 01_rag-zu-fuss.ipynb  # die Stufen 1–2b als Schritt-für-Schritt-Notebook (mit Lücke)
-├── rag-1-chat.py … rag-3c-chat-rerank.py
-├── pyproject.toml            # Laufzeit- und optionale Notebook-Abhängigkeiten
+├── data/
+│   ├── fedlex_download.py    # lädt die Gesetzes-PDFs von Fedlex
+│   ├── fedlex_pdf_to_md.py   # konvertiert PDFs nach Markdown
+│   ├── fedlex_pdfs/          # versionierte Quell-PDFs
+│   └── fedlex_mds/           # erzeugte Markdown-Dateien (unversioniert)
+├── rag-1-chat.py … rag-4b-chat.py
+├── evaluate.py, evaluation/  # Vector-RAG vs. GraphRAG messen
+├── tests/
+├── pyproject.toml
 └── poetry.lock
-```
-
-## Notebook
-
-`notebooks/01_rag-zu-fuss.ipynb` zeigt die Stufen 1–2b Schritt für Schritt,
-mit einer Lücke beim Chunking zum Selbermachen:
-
-```bash
-poetry install --with notebook
-poetry run jupyter lab
 ```
 
 ## Weiterführende Ideen (Workshop Block 2)

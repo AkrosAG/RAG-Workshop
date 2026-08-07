@@ -8,7 +8,3 @@ openai>=1.40
 pypdf>=5.0
 python-dotenv>=1.0
 sentence-transformers>=5.0
-
-# Optional — only for notebooks/01_rag-zu-fuss.ipynb:
-# jupyterlab>=4.0
-# ipykernel>=6.0

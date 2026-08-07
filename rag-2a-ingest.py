@@ -34,7 +34,7 @@ client = OpenAI(
 )
 
 ROOT = Path(__file__).resolve().parent
-DATA = ROOT / "data"
+DATA = ROOT / "data" / "fedlex_mds"
 COLLECTION = "rag_fixed"
 CHUNK_SIZE = 800  # characters per chunk
 OVERLAP = 0       # characters shared between neighbouring chunks

@@ -29,7 +29,7 @@ from openai import OpenAI
 
 
 ROOT = Path(__file__).resolve().parent
-DATA = ROOT / "data"
+DATA = ROOT / "data" / "fedlex_mds"
 CHROMA_PATH = ROOT / ".chroma-3"
 COLLECTION = "rag_semantic"
 MAX_CHUNK_SIZE = 800
