@@ -21,22 +21,24 @@ rag-4b-chat.py         Hybrid GraphRAG: Vektor + Artikelsuche → Graph → Antw
 
 ## Die Stufen
 
-| Skript | Baut auf | Neu |
-|---|---|---|
-| `rag-1-chat.py` | — | OpenAI-kompatibler Client, eine Chat-Anfrage |
-| `rag-2a-ingest.py` | rag-1 | `chunk()` (fix), `embed()`, idempotentes Befüllen von Chroma (`rag_fixed`) |
-| `rag-2b-chat.py` | rag-1 + 2a | Frage embedden → Top-K-Chunks holen → als Kontext in den Prompt |
-| `rag-3a-ingest.py` | rag-2a | artikelorientiertes Chunking für Fedlex: Rauschen filtern, an `Art.` trennen, übergrosse Artikel sicher teilen (Collection `rag_semantic`) |
-| `rag-3b-chat-classical.py` | rag-2b + 3a | unveränderte Vector-Top-K-Abfrage auf den artikelorientierten Chunks |
-| `rag-3c-chat-rerank.py` | rag-3b | Over-Fetch (Top-10) + dynamisches BGE-Re-Ranking von Frage und Chunk → beste 4 |
-| `rag-4a-graph.py` | rag-3a | baut einen transparenten Retrieval-Graph aus Nachbarschaft und `Art.`-Verweisen |
-| `rag-4b-chat.py` | rag-4a | kombiniert Vektor- und lexikalische Artikeltreffer und erweitert sie über Graph-Kanten |
+| Skript                       | Baut auf    | Neu                                                                                                                                             |
+| ---------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rag-1-chat.py`            | —          | OpenAI-kompatibler Client, eine Chat-Anfrage                                                                                                    |
+| `rag-2a-ingest.py`         | rag-1       | `chunk()` (fix), `embed()`, idempotentes Befüllen von Chroma (`rag_fixed`)                                                               |
+| `rag-2b-chat.py`           | rag-1 + 2a  | Frage embedden → Top-K-Chunks holen → als Kontext in den Prompt                                                                               |
+| `rag-3a-ingest.py`         | rag-2a      | artikelorientiertes Chunking für Fedlex: Rauschen filtern, an`Art.` trennen, übergrosse Artikel sicher teilen (Collection `rag_semantic`) |
+| `rag-3b-chat-classical.py` | rag-2b + 3a | unveränderte Vector-Top-K-Abfrage auf den artikelorientierten Chunks                                                                           |
+| `rag-3c-chat-rerank.py`    | rag-3b      | Over-Fetch (Top-10) + dynamisches BGE-Re-Ranking von Frage und Chunk → beste 4                                                                 |
+| `rag-4a-graph.py`          | rag-3a      | baut einen transparenten Retrieval-Graph aus Nachbarschaft und`Art.`-Verweisen                                                                |
+| `rag-4b-chat.py`           | rag-4a      | kombiniert Vektor- und lexikalische Artikeltreffer und erweitert sie über Graph-Kanten                                                         |
 
 Alle Ingests sind **idempotent**: neue oder inhaltlich beziehungsweise durch
 einen Modellwechsel veränderte Chunks werden embedded, obsolete Chunks werden
 entfernt und ein unveränderter zweiter Lauf tut nichts.
 
-## Schnellstart
+## Curriculum
+
+### Schnellstart (Hands-on: Vom Setup zur ersten belegbaren Antwort)
 
 Voraussetzung: Python ≥ 3.10, [Poetry](https://python-poetry.org/), eine
 Verbindung zum AKROS-VPN und ein Marvin-API-Key mit Zugriff auf die
@@ -63,15 +65,95 @@ Dann die Stufen der Reihe nach (mit venv statt Poetry: `python ...` direkt):
 
 ```bash
 poetry run python rag-1-chat.py "Why is the sky blue?"      # 1: Backbone
+```
+
+**Funktioniert** — Allgemeinwissen aus dem Training, flüssig und korrekt beantwortet:
+
+```bash
+poetry run python rag-1-chat.py "Wie hoch ist der aktuelle Normalsatz der Mehrwertsteuer in der Schweiz?"
+```
+
+**Funktioniert nicht mehr** — präzise Quellenarbeit. Das Modell erfindet selbstbewusst einen Wortlaut aus dem Erbrecht samt offiziell aussehendem Fedlex-Link; tatsächlich regelt Art. 721 ZGB die Aufbewahrung gefundener Sachen:
+
+```bash
+poetry run python rag-1-chat.py "Was steht in Art. 721 ZGB? Zitiere den genauen Wortlaut."
+```
+
+Ohne Grounding gibt es keine Verifizierbarkeit — genau das motiviert RAG.
+
+### Semantic Chunking
+
+```bash
 poetry run python rag-2a-ingest.py                            # 2a: Index bauen
 poetry run python rag-2b-chat.py "What is a vector database?" # 2b: RAG
+```
+
+**Funktioniert** — Faktenfragen, deren Antwort kompakt in einem Chunk liegt: korrekt 2,6 Prozent, belegt mit wörtlichem Zitat aus MWSTG Art. 25:
+
+```bash
+poetry run python rag-2b-chat.py "Wie hoch ist der reduzierte Mehrwertsteuersatz?"
+```
+
+**Funktioniert nicht mehr** — verlässliche Artikelangaben. Die Dauer stimmt (ein Monat, verlängerbar auf drei), zitiert wird aber Art. 335c statt 335b: der Fixed-Size-Schnitt trennt die Artikelüberschrift vom Text, und das Modell greift zur Nummer des Nachbarartikels im selben Chunk:
+
+```bash
+poetry run python rag-2b-chat.py "Wie lange dauert die Probezeit im Arbeitsverhältnis?"
+```
+
+### Reranking
+
+```bash
 poetry run python rag-3a-ingest.py --dry-run                  # 3a: Chunks ohne API-Aufruf prüfen
 poetry run python rag-3a-ingest.py                            # 3a: artikelorientierten Index bauen
 poetry run python rag-3b-chat-classical.py "What is a vector database?" # 3b: Vector Top-K
 poetry run python rag-3c-chat-rerank.py "What is a vector database?" # 3c: BGE-Re-Ranking
+```
+
+**3b funktioniert** — dieselbe Probezeit-Frage zitiert jetzt korrekt Art. 335b Abs. 1–3 (plus Art. 344a für Lehrverträge), weil die Chunks Artikelgrenzen respektieren:
+
+```bash
+poetry run python rag-3b-chat-classical.py "Wie lange dauert die Probezeit im Arbeitsverhältnis?"
+```
+
+**3b funktioniert nicht mehr** — der einschlägige Art. 336c (Sperrfristen) liegt für diese Frage nur auf Vektor-Platz 7 und fehlt damit im Top-4-Kontext; die Antwort weicht auf Probezeit- und Ferienartikel aus:
+
+```bash
+poetry run python rag-3b-chat-classical.py "Darf der Arbeitgeber während der Krankheit kündigen?"
+```
+
+**3c funktioniert** — der Cross-Encoder holt Art. 336c von Vektor-Platz 7 auf Platz 1 (Score 0.92), und die Antwort nennt die Sperrfristen von 30/90/180 Tagen:
+
+```bash
+poetry run python rag-3c-chat-rerank.py "Darf der Arbeitgeber während der Krankheit kündigen?"
+```
+
+**3c funktioniert nicht mehr** — Zitierstellen-Fragen. Der Chunk zu Art. 1 OR ist nicht einmal unter den Top-50 der Vektorsuche (die Frage trägt keinen semantischen Inhalt, und der Chunk erwähnt sein eigenes Gesetz nicht); der Reranker kann nur umsortieren, was die Vektorsuche liefert:
+
+```bash
+poetry run python rag-3c-chat-rerank.py "Was steht in Artikel 1 des OR?"
+```
+
+### Hybrid GraphRAG
+
+```bash
 poetry run python rag-4a-graph.py                              # 4a: Graph bauen
 poetry run python rag-4b-chat.py "Wie lange dauert die Probezeit?" # 4b: GraphRAG
 ```
+
+**Funktioniert** — Zitierstellen werden über den Artikel-Definitions-Index des Graphen exakt aufgelöst (`via: cited-article`); auch der in Stufe 1 halluzinierte Art. 721 ZGB kommt jetzt wörtlich korrekt:
+
+```bash
+poetry run python rag-4b-chat.py "Was steht in Artikel 1 des OR?"
+poetry run python rag-4b-chat.py "Was steht in Art. 721 ZGB?"
+```
+
+**Funktioniert nicht mehr** — Aggregation über den ganzen Korpus. Retrieval liefert einzelne Chunks, zählen kann es nicht; die Antwort stellt immerhin ehrlich fest, dass die Zahl nicht im Kontext steht:
+
+```bash
+poetry run python rag-4b-chat.py "Wie viele Artikel hat das ZGB?"
+```
+
+Solche Fragen brauchen andere Werkzeuge (Korpus-Statistik, agentische Ansätze) — die Grenze von Retrieval-Systemen insgesamt.
 
 ## Schweizer Gesetze aus Fedlex vorbereiten
 
