@@ -6,7 +6,7 @@
  </g>
  <g>
   <title>Layer 1</title>
-  <rect id="svg_1" stroke-width="9" stroke="#3E3348" fill="none" rx="24" height="247" width="247" y="4.5" x="4.5"/>
+  <rect id="svg_1" stroke-width="9" stroke="#3E3348" fill="#FFFFFF" fill-opacity="0.5" rx="24" height="247" width="247" y="4.5" x="4.5"/>
   <path id="svg_2" stroke-linejoin="round" stroke-width="9" stroke="#3E3348" fill="#D6EAF9" d="m62,38l132,0a26,26 0 0 1 26,26l0,84a26,26 0 0 1 -26,26l-74,0l-42,38l6,-38l-22,0a26,26 0 0 1 -26,-26l0,-84a26,26 0 0 1 26,-26z"/>
   <path stroke="#F7C74D" id="svg_3" stroke-linecap="round" stroke-width="16" fill="none" d="m111,85.73389a19.49786,19.49786 0 1 1 28.496872,17.998024c-6.749259,3.749588 -8.999012,8.249095 -8.999012,16.498189"/>
   <circle stroke="null" id="svg_4" fill="#F7C74D" r="7.852041" cy="140.891191" cx="130.658165"/>
