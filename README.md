@@ -43,13 +43,16 @@ entfernt und ein unveränderter zweiter Lauf tut nichts.
 Voraussetzung: Python ≥ 3.10, [Poetry](https://python-poetry.org/) und eine Verbindung zum AKROS-VPN. Die Konfiguration inklusive temporärem Workshop-API-Key liegt in `.env` bereit — kein weiteres Setup nötig.
 
 ```bash
+python -m venv .venv    # Windows: py -3.14 -m venv .venv
+source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install poetry
 poetry install
 ```
 
 Ohne Poetry geht es auch mit einem klassischen venv + `requirements.txt`:
 
 ```bash
-python -m venv .venv
+python -m venv .venv    # Windows: py -3.14 -m venv .venv
 source .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
